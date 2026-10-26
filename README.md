@@ -7,7 +7,7 @@ Shoppers can search which verified pharmacies have a medicine in stock, with no 
 - `backend/`: Node 20+, Express 4, Prisma 5, PostgreSQL, zod, JWT
 - `frontend/`: Next.js 15 (App Router), React 19, Tailwind CSS v4, TypeScript
 
-> **Pre-deploy status (26 Oct 2026):** the frontend production build, backend syntax/module loading, Prisma schema validation, inventory validation paths, stock-status rules and CSV handling have been checked. Both npm audits report zero vulnerabilities. Database-backed flows could not be exercised in this environment because PostgreSQL was unavailable. The project has no committed automated test suite, so complete an integration smoke test against a disposable database before deploying.
+> **Pre-deploy status (26 Oct 2026):** the frontend production build, backend syntax/module loading, Prisma schema validation and migration status, and selected database-backed API flows have been checked. Both npm audits report zero vulnerabilities. The project has no committed automated test suite. Live email delivery, image uploads, and LLM generation were not exercised.
 
 ## 1. Setup
 
@@ -96,7 +96,7 @@ API (JWT bearer unless noted): `/auth/*`, `/consumer/auth/*`, `/consumer/search`
 
 ## 7. Known limitations
 
-- Not run or tested end to end (see status above). No automated tests; no generated migration.
+- No automated test suite is committed. Run integration smoke checks against the hosted production configuration before launch.
 - Auth: JWT is kept in `localStorage`; there is no password reset, email verification or token revocation. One admin user per pharmacy (no staff invites).
 - Verification is manual (CLI). NAFDAC numbers are stored as typed and **never validated**.
 - No delivery tracking or payments; the app records reservation and receipt only.
