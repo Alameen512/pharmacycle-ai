@@ -53,6 +53,20 @@ Production: set the production environment variables below, run `npx prisma migr
 
 For production, set `NEXT_PUBLIC_API_URL` to the public HTTPS API origin before building the frontend; it is embedded in the build. Set `NEXT_PUBLIC_SHOW_DEMO=false`, set the backend `CLIENT_URL` to the production frontend origin, and use `NODE_ENV=production`. Do not deploy the local `.env` files.
 
+### Free Vercel + Neon demo setup
+
+The original project README describes deploying its frontend and Express backend as two Vercel projects, with PostgreSQL on Neon. This rebuild can use the same layout for a demo:
+
+1. Import the GitHub repository into Vercel twice. Set the first project's Root Directory to `frontend` (Next.js); set the second project's Root Directory to `backend` (Express).
+2. Create a Neon PostgreSQL project. Set the backend project's `DATABASE_URL` to Neon's pooled connection string, and add `JWT_SECRET`, `CLIENT_URL` (the frontend's HTTPS origin), and `CRON_SECRET` in Vercel's backend environment settings.
+3. Apply the production migration once from the backend folder using Neon's direct (non-pooled) connection URL:
+   ```bash
+   DATABASE_URL="<Neon direct URL>" npx prisma migrate deploy
+   ```
+4. Set the frontend project's `NEXT_PUBLIC_API_URL` to the deployed backend URL and `NEXT_PUBLIC_SHOW_DEMO=false`, then redeploy the frontend.
+
+Vercel Hobby cron jobs run at most once per day, so `/cron/notifications` retries failed emails daily on this demo setup. The in-process `node-cron` timers are disabled on Vercel; local development still uses them. Neon Free compute suspends after five minutes idle, so a first request after inactivity can take longer. Vercel Hobby is for personal, non-commercial use; use this free setup for a demo or testing, not a live pharmacy business.
+
 `GET /config` reports which integrations are live, and the UI uses it so it never implies a feature that is off.
 
 ## 3. Demo accounts (after `npm run seed -- --yes`)
