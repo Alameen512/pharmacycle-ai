@@ -1,0 +1,301 @@
+// PharmaCycle.AI schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PHARMACIST
+  ADMIN
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum InventoryStatus {
+  HEALTHY
+  LOW_STOCK
+  NEAR_EXPIRY
+  OUT_OF_STOCK
+  EXPIRED
+}
+
+enum ListingStatus {
+  AVAILABLE
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum RequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+enum InsightType {
+  EXPIRY_RISK
+  DEMAND_FORECAST
+  RESTOCK_SUGGESTION
+}
+
+enum AlertType {
+  NEAR_EXPIRY
+  EXPIRED
+  LOW_STOCK
+  OUT_OF_STOCK
+  TRANSFER_REQUEST
+  TRANSFER_UPDATE
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  URGENT
+}
+
+enum RecipientType {
+  USER
+  CONSUMER
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+model Pharmacy {
+  id                 String             @id @default(uuid())
+  name               String
+  address            String             @default("")
+  city               String
+  state              String
+  phone              String?
+  lat                Float?
+  lng                Float?
+  verificationStatus VerificationStatus @default(PENDING)
+  verifiedAt         DateTime?
+  logoUrl            String?
+
+  // Notification preferences (honoured by alert + email generation)
+  alertNearExpiry Boolean @default(true)
+  alertLowStock   Boolean @default(true)
+  alertTransfer   Boolean @default(true)
+  emailTransfer   Boolean @default(true)
+  emailStock      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users            User[]
+  inventoryItems   InventoryItem[]
+  transferListings TransferListing[]
+  transferRequests TransferRequest[]
+  salesRecords     SalesRecord[]
+  aiInsights       AIInsight[]
+  alerts           Alert[]
+
+  @@index([verificationStatus, city, state])
+}
+
+model User {
+  id           String   @id @default(uuid())
+  pharmacyId   String
+  pharmacy     Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         UserRole @default(PHARMACIST)
+  createdAt    DateTime @default(now())
+
+  @@index([pharmacyId])
+}
+
+model Consumer {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  city         String?
+  state        String?
+  createdAt    DateTime @default(now())
+}
+
+model Medicine {
+  id         String   @id @default(uuid())
+  name       String
+  category   String
+  dosageForm String
+  strength   String
+  imageUrl   String?
+  createdAt  DateTime @default(now())
+
+  inventoryItems InventoryItem[]
+  salesRecords   SalesRecord[]
+
+  @@unique([name, strength, dosageForm])
+  @@index([name])
+}
+
+model InventoryItem {
+  id               String          @id @default(uuid())
+  pharmacyId       String
+  pharmacy         Pharmacy        @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  medicineId       String
+  medicine         Medicine        @relation(fields: [medicineId], references: [id], onDelete: Restrict)
+  quantity         Int
+  reservedQty      Int             @default(0)
+  costPrice        Decimal         @db.Decimal(12, 2)
+  sellingPrice     Decimal         @db.Decimal(12, 2)
+  batchNumber      String
+  nafdacRegNo      String?
+  expiryDate       DateTime        @db.Date
+  status           InventoryStatus @default(HEALTHY)
+  imageUrl         String?
+  source           String          @default("manual") // manual | scan | transfer
+  sourceRequestId  String?
+  sourcePharmacyId String?
+  deletedAt        DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  transferListings TransferListing[]
+
+  @@index([pharmacyId, deletedAt])
+  @@index([medicineId])
+  @@index([expiryDate])
+  @@index([status])
+}
+
+model TransferListing {
+  id              String        @id @default(uuid())
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+  pharmacyId      String
+  pharmacy        Pharmacy      @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  quantity        Int
+  reservedQty     Int           @default(0)
+  completedQty    Int           @default(0)
+  discountPercent Float         @default(0)
+  status          ListingStatus @default(AVAILABLE)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  requests TransferRequest[]
+
+  @@index([pharmacyId, status])
+  @@index([inventoryItemId])
+  @@index([status])
+}
+
+model TransferRequest {
+  id                   String          @id @default(uuid())
+  listingId            String
+  listing              TransferListing @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  requestingPharmacyId String
+  requestingPharmacy   Pharmacy        @relation(fields: [requestingPharmacyId], references: [id], onDelete: Cascade)
+  quantity             Int
+  unitPrice            Decimal         @db.Decimal(12, 2)
+  message              String?
+  status               RequestStatus   @default(PENDING)
+  respondedAt          DateTime?
+  completedAt          DateTime?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  events TransferEvent[]
+
+  @@index([listingId, status])
+  @@index([requestingPharmacyId, status])
+  @@index([status])
+}
+
+// Append-only audit trail of every transfer state change
+model TransferEvent {
+  id              String          @id @default(uuid())
+  requestId       String
+  request         TransferRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actorPharmacyId String
+  actorUserId     String?
+  type            String // REQUESTED | ACCEPTED | REJECTED | CANCELLED | COMPLETED
+  fromStatus      RequestStatus?
+  toStatus        RequestStatus
+  quantity        Int
+  note            String?
+  createdAt       DateTime        @default(now())
+
+  @@index([requestId, createdAt])
+}
+
+model SalesRecord {
+  id           String   @id @default(uuid())
+  pharmacyId   String
+  pharmacy     Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  medicineId   String
+  medicine     Medicine @relation(fields: [medicineId], references: [id], onDelete: Restrict)
+  quantitySold Int
+  date         DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([pharmacyId, date])
+  @@index([pharmacyId, medicineId])
+}
+
+model AIInsight {
+  id              String      @id @default(uuid())
+  pharmacyId      String
+  pharmacy        Pharmacy    @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  type            InsightType
+  payload         Json
+  inputWindowDays Int
+  model           String?
+  generatedAt     DateTime    @default(now())
+
+  @@index([pharmacyId, type, generatedAt])
+}
+
+model Alert {
+  id         String        @id @default(uuid())
+  pharmacyId String
+  pharmacy   Pharmacy      @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  type       AlertType
+  severity   AlertSeverity @default(INFO)
+  message    String
+  link       String?
+  read       Boolean       @default(false)
+  dedupeKey  String?
+  createdAt  DateTime      @default(now())
+
+  @@unique([pharmacyId, dedupeKey])
+  @@index([pharmacyId, read, createdAt])
+}
+
+model Notification {
+  id            String             @id @default(uuid())
+  recipientType RecipientType
+  recipientId   String
+  pharmacyId    String?
+  toEmail       String
+  channel       String             @default("email")
+  subject       String
+  body          String
+  status        NotificationStatus @default(PENDING)
+  attempts      Int                @default(0)
+  lastError     String?
+  sentAt        DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([status, attempts])
+}
