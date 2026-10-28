@@ -2,6 +2,7 @@ const { Resend } = require('resend');
 const config = require('../config');
 const prisma = require('./prisma');
 
+
 const MAX_ATTEMPTS = 3;
 let client = null;
 const getClient = () => (client ||= new Resend(config.resend.apiKey));

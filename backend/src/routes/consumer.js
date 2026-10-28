@@ -9,6 +9,8 @@ const { sign } = require('../utils/jwt');
 const { todayLagosUtcMs } = require('../utils/status');
 const { haversineKm } = require('../utils/geo');
 const { num } = require('../utils/serialize');
+const { pushAlert, safely } = require('../lib/alerts');
+const { emailPharmacyAdmins } = require('../lib/notifications');
 
 const router = express.Router();
 
@@ -101,6 +103,109 @@ router.get('/search', validate(searchSchema, 'query'), async (req, res) => {
       : a.medicine.name.localeCompare(b.medicine.name) || a.price - b.price
   );
   res.json({ results: results.slice(0, 50), total: results.length, sortedByDistance: sortByDistance });
+});
+
+
+
+const deliveryRequestSchema = z.object({
+  inventoryItemId: z.string().uuid('Invalid medicine listing.'),
+  customerName: z.string().trim().min(2, 'Enter your name.').max(100),
+  customerPhone: z.string().trim().min(7, 'Enter a valid phone number.').max(30),
+  customerEmail: z.preprocess(
+    (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+    z.string().trim().toLowerCase().email('Enter a valid email address.').max(190).optional()
+  ),
+  deliveryAddress: z.string().trim().min(5, 'Enter your delivery address.').max(500),
+  quantity: z.coerce.number().int().min(1).max(1000),
+});
+
+router.post('/delivery-requests', validate(deliveryRequestSchema), async (req, res) => {
+  const {
+    inventoryItemId,
+    customerName,
+    customerPhone,
+    customerEmail,
+    deliveryAddress,
+    quantity,
+  } = req.body;
+
+  const item = await prisma.inventoryItem.findFirst({
+    where: {
+      id: inventoryItemId,
+      deletedAt: null,
+      quantity: { gt: 0 },
+      expiryDate: { gte: new Date(todayLagosUtcMs()) },
+      status: { in: ['HEALTHY', 'LOW_STOCK', 'NEAR_EXPIRY'] },
+      pharmacy: { verificationStatus: 'VERIFIED' },
+    },
+    include: {
+      medicine: true,
+      pharmacy: { select: { id: true, name: true } },
+    },
+  });
+
+  if (!item || item.quantity - item.reservedQty < quantity) {
+    throw new HttpError(
+      400,
+      'This medicine is no longer available in the requested quantity. Please search again.',
+      'INSUFFICIENT_STOCK'
+    );
+  }
+
+  const request = await prisma.deliveryRequest.create({
+    data: {
+      pharmacyId: item.pharmacyId,
+      inventoryItemId: item.id,
+      customerName,
+      customerPhone,
+      customerEmail,
+      deliveryAddress,
+      quantity,
+      unitPrice: item.sellingPrice,
+    },
+  });
+
+  await safely('delivery-request-alert', () =>
+    pushAlert({
+      pharmacyId: item.pharmacyId,
+      type: 'DELIVERY_REQUEST',
+      severity: 'INFO',
+      message: `New delivery request: ${quantity} × ${item.medicine.name} from ${customerName}.`,
+      link: '/alerts',
+      dedupeKey: `delivery-request:${request.id}`,
+    })
+  );
+
+  await safely('delivery-request-email', () =>
+    emailPharmacyAdmins(item.pharmacyId, 'emailDelivery', {
+      subject: `New delivery request — ${item.medicine.name}`,
+      text: [
+        `A customer has requested delivery from ${item.pharmacy.name}.`,
+        '',
+        `Medicine: ${item.medicine.name} ${item.medicine.strength}`,
+        `Quantity: ${quantity}`,
+        `Unit price: ${num(item.sellingPrice)}`,
+        `Customer: ${customerName}`,
+        `Phone: ${customerPhone}`,
+        `Email: ${customerEmail || 'Not provided'}`,
+        `Delivery address: ${deliveryAddress}`,
+        '',
+        'Status: PENDING',
+        'This is a request, not a confirmed order. Contact the customer to confirm stock, delivery fee and payment.',
+      ].join('\n'),
+    })
+  );
+
+  res.status(201).json({
+    message: 'Your delivery request has been submitted. The pharmacy must confirm availability, delivery fees and payment before the order is confirmed.',
+    request: {
+      id: request.id,
+      status: request.status,
+      quantity: request.quantity,
+      unitPrice: num(request.unitPrice),
+      createdAt: request.createdAt,
+    },
+  });
 });
 
 module.exports = router;

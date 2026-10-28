@@ -46,6 +46,7 @@ app.get('/cron/maintenance', cronAuth, async (req, res) => res.json(await runMai
 app.get('/cron/notifications', cronAuth, async (req, res) => res.json({ retried: await retryFailed() }));
 
 app.use('/auth', require('./routes/auth'));
+app.use('/platform-admin', require('./routes/platformAdmin'));
 app.use('/consumer', require('./routes/consumer'));
 app.use('/dashboard', require('./routes/dashboard'));
 app.use('/inventory', require('./routes/inventory'));

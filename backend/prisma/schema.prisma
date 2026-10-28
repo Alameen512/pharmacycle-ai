@@ -41,6 +41,13 @@ enum RequestStatus {
   COMPLETED
   CANCELLED
 }
+enum DeliveryRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
 
 enum InsightType {
   EXPIRY_RISK
@@ -55,6 +62,7 @@ enum AlertType {
   OUT_OF_STOCK
   TRANSFER_REQUEST
   TRANSFER_UPDATE
+  DELIVERY_REQUEST
 }
 
 enum AlertSeverity {
@@ -94,6 +102,8 @@ model Pharmacy {
   alertTransfer   Boolean @default(true)
   emailTransfer   Boolean @default(true)
   emailStock      Boolean @default(true)
+  alertDelivery Boolean @default(true)
+  emailDelivery Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -105,6 +115,7 @@ model Pharmacy {
   salesRecords     SalesRecord[]
   aiInsights       AIInsight[]
   alerts           Alert[]
+  deliveryRequests DeliveryRequest[]
 
   @@index([verificationStatus, city, state])
 }
@@ -169,6 +180,7 @@ model InventoryItem {
   deletedAt        DateTime?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
+  deliveryRequests DeliveryRequest[]
 
   transferListings TransferListing[]
 
@@ -298,4 +310,24 @@ model Notification {
   updatedAt     DateTime           @updatedAt
 
   @@index([status, attempts])
+}
+
+model DeliveryRequest {
+  id              String                @id @default(uuid())
+  pharmacyId      String
+  pharmacy        Pharmacy              @relation(fields: [pharmacyId], references: [id], onDelete: Restrict)
+  inventoryItemId String
+  inventoryItem   InventoryItem         @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+  deliveryAddress String
+  quantity        Int
+  unitPrice       Decimal               @db.Decimal(12, 2)
+  status          DeliveryRequestStatus @default(PENDING)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@index([pharmacyId, status, createdAt])
+  @@index([inventoryItemId])
 }

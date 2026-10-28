@@ -3,6 +3,7 @@ const prisma = require('./prisma');
 const PREF_BY_TYPE = {
   TRANSFER_REQUEST: 'alertTransfer',
   TRANSFER_UPDATE: 'alertTransfer',
+  DELIVERY_REQUEST: 'alertDelivery',
   NEAR_EXPIRY: 'alertNearExpiry',
   EXPIRED: 'alertNearExpiry',
   LOW_STOCK: 'alertLowStock',
