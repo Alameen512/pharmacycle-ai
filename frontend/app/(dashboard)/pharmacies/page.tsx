@@ -1,11 +1,28 @@
+
 'use client';
+
 import { useEffect, useState } from 'react';
-import { Badge, EmptyState, ErrorState, Icon, LoadingBlock, Pagination } from '@/components/ui';
+import {
+  Badge,
+  EmptyState,
+  ErrorState,
+  Icon,
+  LoadingBlock,
+  Pagination,
+} from '@/components/ui';
 import { NIGERIAN_STATES } from '@/lib/format';
 import type { Pagination as Pg } from '@/lib/types';
 import { useApi } from '@/lib/useApi';
 
-type P = { id: string; name: string; address: string; city: string; state: string; phone: string | null; distanceKm: number | null };
+type P = {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  phone: string | null;
+  distanceKm: number | null;
+};
 
 export default function PharmaciesPage() {
   const [search, setSearch] = useState('');
@@ -14,55 +31,321 @@ export default function PharmaciesPage() {
   const [page, setPage] = useState(1);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [geoMsg, setGeoMsg] = useState('');
+  const [locating, setLocating] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => { setDsearch(search); setPage(1); }, 300);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => {
+      setDsearch(search);
+      setPage(1);
+    }, 300);
+
+    return () => clearTimeout(timer);
   }, [search]);
 
-  const { data, error, loading, reload } = useApi<{ pharmacies: P[]; pagination: Pg; sortedByDistance: boolean }>('/pharmacies', { search: dsearch, state, page, pageSize: 12, lat: coords?.lat, lng: coords?.lng });
+  const {
+    data,
+    error,
+    loading,
+    reload,
+  } = useApi<{
+    pharmacies: P[];
+    pagination: Pg;
+    sortedByDistance: boolean;
+  }>('/pharmacies', {
+    search: dsearch,
+    state,
+    page,
+    pageSize: 12,
+    lat: coords?.lat,
+    lng: coords?.lng,
+  });
 
   function locate() {
-    if (!('geolocation' in navigator)) return setGeoMsg('This browser cannot share your location.');
+    if (!('geolocation' in navigator)) {
+      setGeoMsg('Your browser does not support location sharing.');
+      return;
+    }
+
+    setLocating(true);
+    setGeoMsg('');
+
     navigator.geolocation.getCurrentPosition(
-      (p) => { setCoords({ lat: p.coords.latitude, lng: p.coords.longitude }); setPage(1); setGeoMsg(''); },
-      () => setGeoMsg('Location permission was not granted.'),
+      (position) => {
+        setCoords({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+        setPage(1);
+        setLocating(false);
+        setGeoMsg('');
+      },
+      (error) => {
+        setLocating(false);
+
+        if (error.code === error.PERMISSION_DENIED) {
+          setGeoMsg('Location permission was denied. You can enable it in your browser settings.');
+        } else if (error.code === error.TIMEOUT) {
+          setGeoMsg('Location request timed out. Please try again.');
+        } else {
+          setGeoMsg('Unable to determine your location. Please try again.');
+        }
+      },
       { timeout: 10000 }
     );
   }
 
-  return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1">
-          <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input aria-label="Search pharmacies" className="input pl-9" placeholder="Search by name, city or address" value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
-        <select aria-label="Filter by state" className="input sm:w-48" value={state} onChange={(e) => { setState(e.target.value); setPage(1); }}>
-          <option value="">All states</option>
-          {NIGERIAN_STATES.map((s) => <option key={s}>{s}</option>)}
-        </select>
-        <button className="btn btn-secondary" onClick={coords ? () => setCoords(null) : locate}><Icon name="pin" className="h-4 w-4" />{coords ? 'Clear location sort' : 'Nearest first'}</button>
-      </div>
-      {geoMsg && <p role="status" className="text-sm text-gray-600">{geoMsg}</p>}
+  function clearFilters() {
+    setSearch('');
+    setDsearch('');
+    setState('');
+    setCoords(null);
+    setPage(1);
+    setGeoMsg('');
+  }
 
-      {loading && !data ? <LoadingBlock /> : error ? <div className="card"><ErrorState message={error} onRetry={reload} /></div> : !data?.pharmacies.length ? (
-        <div className="card"><EmptyState title="No verified pharmacies found" body="Only pharmacies that have been verified are listed. Try a different search or state." /></div>
-      ) : (
-        <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {data.pharmacies.map((p) => (
-              <article key={p.id} className="card p-5">
-                <div className="flex items-start justify-between gap-2"><h3 className="font-semibold text-gray-900">{p.name}</h3><Badge tone="green">Verified</Badge></div>
-                <p className="mt-2 flex items-start gap-1.5 text-sm text-gray-600"><Icon name="pin" className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" /><span>{[p.address, p.city, p.state].filter(Boolean).join(', ')}</span></p>
-                {p.phone && <p className="mt-1 text-sm text-gray-600">{p.phone}</p>}
-                {p.distanceKm !== null && <p className="mt-2 text-xs text-gray-500">{p.distanceKm} km away</p>}
-              </article>
-            ))}
+  const hasFilters = Boolean(search || state || coords);
+
+  return (
+    <div className="min-w-0 space-y-6 overflow-x-clip">
+      {/* Page introduction */}
+      <section className="flex min-w-0 flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="min-w-0">
+          <span className="mb-2 inline-flex rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
+            Pharmacy network
+          </span>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-950">
+            Partner pharmacies
+          </h1>
+          <p className="mt-1 max-w-xl text-sm text-gray-500">
+            Discover verified pharmacies, explore nearby partners and find
+            pharmacies across Nigeria.
+          </p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2 rounded-xl border border-gray-100 bg-white px-3 py-2.5">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-50 text-green-700">
+            <Icon name="users" className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">
+              Verified network
+            </p>
+            <p className="text-xs text-gray-500">
+              Trusted pharmacy directory
+            </p>
           </div>
-          <Pagination page={data.pagination.page} totalPages={data.pagination.totalPages} total={data.pagination.total} onPage={setPage} />
-        </>
-      )}
+        </div>
+      </section>
+
+      {/* Search and filters */}
+      <section className="card space-y-4 p-4 sm:p-5">
+        <div>
+          <h2 className="font-semibold text-gray-900">
+            Find a pharmacy
+          </h2>
+          <p className="mt-1 text-xs text-gray-500">
+            Search by pharmacy name or location.
+          </p>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-2 lg:flex-row">
+          <div className="relative min-w-0 flex-1">
+            <Icon
+              name="search"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+            />
+            <input
+              aria-label="Search pharmacies"
+              className="input w-full pl-9"
+              placeholder="Pharmacy name, city or address..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <select
+            aria-label="Filter by state"
+            className="input w-full lg:w-52"
+            value={state}
+            onChange={(e) => {
+              setState(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All states</option>
+            {NIGERIAN_STATES.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+
+          <button
+            className="btn btn-secondary shrink-0"
+            onClick={coords ? () => {
+              setCoords(null);
+              setPage(1);
+              setGeoMsg('');
+            } : locate}
+            disabled={locating}
+          >
+            <Icon name="pin" className="h-4 w-4" />
+            {locating
+              ? 'Finding location…'
+              : coords
+                ? 'Clear location'
+                : 'Nearest first'}
+          </button>
+        </div>
+
+        {geoMsg && (
+          <p role="status" className="text-sm text-amber-700">
+            {geoMsg}
+          </p>
+        )}
+
+        {coords && (
+          <p className="flex items-center gap-2 text-xs font-medium text-green-700">
+            <Icon name="checkCircle" className="h-4 w-4" />
+            Showing pharmacies based on your location.
+          </p>
+        )}
+
+        {hasFilters && (
+          <div className="flex justify-end">
+            <button
+              className="text-xs font-semibold text-gray-500 transition hover:text-gray-900"
+              onClick={clearFilters}
+            >
+              Clear all filters
+            </button>
+          </div>
+        )}
+      </section>
+
+      {/* Directory results */}
+      <section className="min-w-0 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="font-semibold text-gray-900">
+              Pharmacy directory
+            </h2>
+            <p className="mt-1 text-xs text-gray-500">
+              {data
+                ? `${data.pagination.total} verified pharmacies found`
+                : 'Browse verified pharmacies in the network'}
+            </p>
+          </div>
+
+          {data?.sortedByDistance && (
+            <Badge tone="green">Sorted by distance</Badge>
+          )}
+        </div>
+
+        {loading && !data ? (
+          <div className="card">
+            <LoadingBlock />
+          </div>
+        ) : error ? (
+          <div className="card">
+            <ErrorState message={error} onRetry={reload} />
+          </div>
+        ) : !data?.pharmacies.length ? (
+          <div className="card">
+            <EmptyState
+              title="No pharmacies found"
+              body={
+                hasFilters
+                  ? 'No verified pharmacies match your current search. Try changing your search or clearing the filters.'
+                  : 'There are currently no verified pharmacies available in the directory.'
+              }
+              action={
+                hasFilters ? (
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={clearFilters}
+                  >
+                    Clear filters
+                  </button>
+                ) : undefined
+              }
+            />
+          </div>
+        ) : (
+          <>
+            <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {data.pharmacies.map((pharmacy) => (
+                <article
+                  key={pharmacy.id}
+                  className="card flex min-w-0 flex-col p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:p-5"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-700">
+                      <Icon name="pharmacy" className="h-5 w-5" />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <h3 className="break-words font-semibold leading-snug text-gray-900">
+                        {pharmacy.name}
+                      </h3>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {pharmacy.city}, {pharmacy.state}
+                      </p>
+                    </div>
+
+                    <Badge tone="green">Verified</Badge>
+                  </div>
+
+                  <div className="mt-5 space-y-3">
+                    <div className="flex items-start gap-2 text-sm text-gray-600">
+                      <Icon
+                        name="pin"
+                        className="mt-0.5 h-4 w-4 shrink-0 text-gray-400"
+                      />
+                      <span className="break-words">
+                        {pharmacy.address}
+                        {pharmacy.city ? `, ${pharmacy.city}` : ''}
+                        {pharmacy.state ? `, ${pharmacy.state}` : ''}
+                      </span>
+                    </div>
+
+                    {pharmacy.phone && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <Icon
+                          name="person"
+                          className="h-4 w-4 shrink-0 text-gray-400"
+                        />
+                        <span>{pharmacy.phone}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-5 flex items-center justify-between gap-2 border-t border-gray-100 pt-3">
+                    <span className="text-xs text-gray-400">
+                      Verified partner
+                    </span>
+
+                    {pharmacy.distanceKm !== null && (
+                      <span className="rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-700">
+                        {pharmacy.distanceKm} km away
+                      </span>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="rounded-xl border border-gray-100 bg-white px-4">
+              <Pagination
+                page={data.pagination.page}
+                totalPages={data.pagination.totalPages}
+                total={data.pagination.total}
+                onPage={setPage}
+              />
+            </div>
+          </>
+        )}
+      </section>
     </div>
   );
 }
