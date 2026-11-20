@@ -75,6 +75,10 @@ enum RecipientType {
   USER
   CONSUMER
 }
+enum PasswordResetAccountType {
+  USER
+  CONSUMER
+}
 
 enum NotificationStatus {
   PENDING
@@ -330,4 +334,15 @@ model DeliveryRequest {
 
   @@index([pharmacyId, status, createdAt])
   @@index([inventoryItemId])
+}
+model PasswordResetToken {
+  id          String                   @id @default(uuid())
+  accountType PasswordResetAccountType
+  accountId   String
+  tokenHash   String                   @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime                 @default(now())
+
+  @@index([accountType, accountId, expiresAt])
 }

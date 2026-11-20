@@ -1,3 +1,4 @@
+
 require('express-async-errors');
 const config = require('./config');
 const express = require('express');
@@ -28,24 +29,58 @@ app.use(
 app.use(express.json({ limit: '4mb' }));
 
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, limit: 40, standardHeaders: true, legacyHeaders: false,
-  message: { error: 'Too many attempts. Try again in a few minutes.', code: 'RATE_LIMITED' },
+  windowMs: 15 * 60 * 1000,
+  limit: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Too many attempts. Try again in a few minutes.',
+    code: 'RATE_LIMITED',
+  },
 });
+
+const passwordResetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Too many password reset attempts. Please try again later.',
+    code: 'RATE_LIMITED',
+  },
+});
+
 app.use(['/auth/login', '/auth/register', '/consumer/auth'], authLimiter);
 
-app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
+app.get('/health', (req, res) =>
+  res.json({ status: 'ok', time: new Date().toISOString() })
+);
 
-// Tells the UI which integrations are actually live, so it never implies a feature that is off.
+// Tells the UI which integrations are actually live.
 app.get('/config', (req, res) =>
-  res.json({ ai: ai.isConfigured(), serverOcr: ocr.isConfigured(), email: Boolean(config.resend.apiKey), imageUploads: config.cloudinaryConfigured })
+  res.json({
+    ai: ai.isConfigured(),
+    serverOcr: ocr.isConfigured(),
+    email: Boolean(config.resend.apiKey),
+    imageUploads: config.cloudinaryConfigured,
+  })
 );
 
 const cronAuth = (req, res, next) =>
-  config.cronSecret && req.headers.authorization === `Bearer ${config.cronSecret}` ? next() : res.status(401).json({ error: 'Unauthorized' });
-app.get('/cron/maintenance', cronAuth, async (req, res) => res.json(await runMaintenance()));
-app.get('/cron/notifications', cronAuth, async (req, res) => res.json({ retried: await retryFailed() }));
+  config.cronSecret && req.headers.authorization === `Bearer ${config.cronSecret}`
+    ? next()
+    : res.status(401).json({ error: 'Unauthorized' });
+
+app.get('/cron/maintenance', cronAuth, async (req, res) =>
+  res.json(await runMaintenance())
+);
+
+app.get('/cron/notifications', cronAuth, async (req, res) =>
+  res.json({ retried: await retryFailed() })
+);
 
 app.use('/auth', require('./routes/auth'));
+app.use('/password-reset', passwordResetLimiter, require('./routes/passwordReset'));
 app.use('/platform-admin', require('./routes/platformAdmin'));
 app.use('/consumer', require('./routes/consumer'));
 app.use('/dashboard', require('./routes/dashboard'));
@@ -59,14 +94,22 @@ app.use('/pharmacy', require('./routes/pharmacy'));
 app.use('/analytics', require('./routes/analytics'));
 app.use('/reports', require('./routes/reports'));
 
-app.use((req, res) => res.status(404).json({ error: 'Route not found.', code: 'NOT_FOUND' }));
+app.use((req, res) =>
+  res.status(404).json({ error: 'Route not found.', code: 'NOT_FOUND' })
+);
+
 app.use(errorHandler);
 
 if (require.main === module) {
   app.listen(config.port, () => {
     console.log(`PharmaCycle.AI API listening on :${config.port}`);
     startJobs();
-    if (config.runMaintenanceOnBoot) runMaintenance().then((s) => console.log('[job:maintenance]', s)).catch((e) => console.error(e));
+
+    if (config.runMaintenanceOnBoot) {
+      runMaintenance()
+        .then((s) => console.log('[job:maintenance]', s))
+        .catch((e) => console.error(e));
+    }
   });
 }
 

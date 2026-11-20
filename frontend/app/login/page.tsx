@@ -206,6 +206,15 @@ export default function LoginPage() {
           </div>
         </Field>
 
+        <div className="-mt-2 flex justify-end">
+          <Link
+            href={`/forgot-password?type=${role}`}
+            className="text-sm font-semibold text-brand-700 transition-colors hover:text-brand-800 hover:underline"
+          >
+            Forgot password?
+          </Link>
+        </div>
+
         <button
           type="submit"
           disabled={busy}
