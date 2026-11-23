@@ -31,7 +31,6 @@ function ProductPreview() {
   return (
     <div className="relative">
       <div className="absolute -inset-5 rounded-[36px] bg-gradient-to-br from-green-500/15 via-emerald-300/10 to-transparent blur-2xl" />
-
       <div className="relative overflow-hidden rounded-[28px] border border-white/50 bg-[#0d4f3c] p-4 shadow-[0_35px_90px_rgba(13,79,60,0.24)] sm:p-5">
         <div className="mb-5 flex items-center gap-2">
           <span className="h-3 w-3 rounded-full bg-[#ff5f57]" />
@@ -178,7 +177,6 @@ export default function Landing() {
       <main>
         <section className="relative px-5 pb-20 pt-16 sm:px-8 md:pb-24 md:pt-24 lg:px-12">
           <div className="pointer-events-none absolute -right-32 top-12 h-96 w-96 rounded-full bg-green-200/30 blur-3xl" />
-
           <div className="relative mx-auto grid max-w-7xl gap-14 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
             <div className="space-y-8">
               <div className="inline-flex items-center gap-2 rounded-full border border-green-100 bg-white/75 px-4 py-2 text-xs font-semibold text-green-700 shadow-sm">
@@ -194,7 +192,6 @@ export default function Landing() {
                   <br />
                   <span className="text-green-600">Save lives.</span>
                 </h1>
-
                 <p className="max-w-xl text-base leading-relaxed text-gray-600 sm:text-lg">
                   PharmaCycle.AI connects pharmacies to help manage surplus
                   medicines, identify expiry risks and coordinate stock
@@ -211,7 +208,6 @@ export default function Landing() {
                   Register your pharmacy
                   <Icon name="chevronDown" className="h-4 w-4 -rotate-90" />
                 </Link>
-
                 <Link
                   href="/search"
                   className="inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-6 py-3.5 text-sm font-bold text-gray-800 transition-colors hover:border-gray-300 hover:bg-gray-50"
@@ -359,7 +355,6 @@ export default function Landing() {
               Join the PharmaCycle.AI network and take a smarter approach to
               inventory, surplus stock and medicine availability.
             </p>
-
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <Link href="/signup" className="rounded-xl bg-white px-7 py-3.5 text-sm font-bold text-[#0d4f3c] transition-opacity hover:opacity-90">
                 Register your pharmacy
@@ -372,45 +367,45 @@ export default function Landing() {
         </section>
       </main>
 
-      <footer className="bg-[#0e1a14] px-5 pb-8 pt-12 text-white/70 sm:px-8 md:px-12">
-        <div className="mx-auto grid max-w-7xl gap-10 border-b border-white/10 pb-10 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]">
+      <footer className="bg-[#0e1a14] px-5 pb-8 pt-12 text-white sm:px-8 md:px-12">
+        <div className="mx-auto grid max-w-7xl gap-10 border-b border-white/15 pb-10 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]">
           <div>
             <Link href="/" className="inline-flex items-center">
-              <BrandMark size="sm" />
+              <BrandMark size="sm" light />
             </Link>
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/45">
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/75">
               Connecting pharmacies and communities to reduce medicine waste
               and improve access to available stock.
             </p>
           </div>
 
           <div>
-            <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-white/50">
+            <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-green-300">
               Explore
             </h3>
             <div className="flex flex-col gap-3">
-              <Link href="/search" className="text-sm text-white/60 transition-colors hover:text-green-400">Find medicines</Link>
-              <Link href="/signup" className="text-sm text-white/60 transition-colors hover:text-green-400">Register a pharmacy</Link>
-              <Link href="/login" className="text-sm text-white/60 transition-colors hover:text-green-400">Pharmacy login</Link>
-              <a href="#how-it-works" className="text-sm text-white/60 transition-colors hover:text-green-400">How it works</a>
+              <Link href="/search" className="text-sm text-white/80 transition-colors hover:text-green-300">Find medicines</Link>
+              <Link href="/signup" className="text-sm text-white/80 transition-colors hover:text-green-300">Register a pharmacy</Link>
+              <Link href="/login" className="text-sm text-white/80 transition-colors hover:text-green-300">Pharmacy login</Link>
+              <a href="#how-it-works" className="text-sm text-white/80 transition-colors hover:text-green-300">How it works</a>
             </div>
           </div>
 
           <div>
-            <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-white/50">
+            <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-green-300">
               Information
             </h3>
             <div className="flex flex-col gap-3">
-              <Link href="/legal" className="text-sm text-white/60 transition-colors hover:text-green-400">Privacy and terms</Link>
-              <Link href="/help" className="text-sm text-white/60 transition-colors hover:text-green-400">Help centre</Link>
-              <a href={`mailto:${SUPPORT_EMAIL}`} className="text-sm text-white/60 transition-colors hover:text-green-400">Contact support</a>
+              <Link href="/legal" className="text-sm text-white/80 transition-colors hover:text-green-300">Privacy and terms</Link>
+              <Link href="/help" className="text-sm text-white/80 transition-colors hover:text-green-300">Help centre</Link>
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="text-sm text-white/80 transition-colors hover:text-green-300">Contact support</a>
             </div>
           </div>
         </div>
 
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 pt-7 text-center text-xs text-white/35 sm:flex-row sm:text-left">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 pt-7 text-center text-xs text-white/75 sm:flex-row sm:text-left">
           <p>© {new Date().getFullYear()} PharmaCycle.AI. All rights reserved.</p>
-          <p>Share. Save. Save lives.</p>
+          <p className="font-medium text-green-300">Share. Save. Save lives.</p>
         </div>
       </footer>
     </div>
