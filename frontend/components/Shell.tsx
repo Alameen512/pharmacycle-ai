@@ -114,17 +114,10 @@ const NAV_GROUPS: NavGroup[] = [
       },
       {
         href: '/analysis',
-        label: 'Analysis',
+        label: 'Reports & Analytics',
         icon: 'chart',
-        title: 'Analysis',
-        subtitle: 'Deep-dive into inventory trends, category performance, and demand patterns.',
-      },
-      {
-        href: '/reports',
-        label: 'Reports',
-        icon: 'file',
-        title: 'Reports',
-        subtitle: 'Export and review inventory and transfer reports.',
+        title: 'Reports & Analytics',
+        subtitle: 'Track business performance, review inventory and transfers, and export reports.',
       },
       {
         href: '/alerts',
@@ -362,7 +355,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
     ...UTILITY_LINKS,
   ];
 
-  // Only NavItem entries have title and subtitle.
   const meta = allPages.find((item) => item.href === pathname);
 
   const { data } = useApi<{ summary: { unread: number } }>('/alerts', {

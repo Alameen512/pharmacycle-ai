@@ -1,15 +1,19 @@
 
 'use client';
 
+import { useState } from 'react';
 import {
   EmptyState,
   ErrorState,
+  Field,
   Icon,
   LoadingBlock,
   PageCard,
+  Spinner,
   StatCard,
 } from '@/components/ui';
-import { formatDate, num } from '@/lib/format';
+import { downloadCsv, errorMessage } from '@/lib/api';
+import { formatDate, num, STOCK_META } from '@/lib/format';
 import { useApi } from '@/lib/useApi';
 
 type Counts = Record<
@@ -32,8 +36,17 @@ type Summary = {
     unitsSold: number;
     unitsOnHand: number;
     salesToStockRatio: number | null;
+    daily: { date: string; unitsSold: number }[];
+    monthly: { month: string; unitsSold: number }[];
   };
 };
+
+type ExportResult = {
+  ok: boolean;
+  text: string;
+};
+
+type ExportKey = 'inventory' | 'transfers' | 'sales';
 
 const STAGES: [string, keyof Counts, string][] = [
   ['Pending', 'PENDING', '#f59e0b'],
@@ -83,6 +96,77 @@ export default function AnalysisPage() {
     '/analytics/summary'
   );
 
+  const [status, setStatus] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [busy, setBusy] = useState('');
+  const [salesView, setSalesView] = useState<'daily' | 'monthly'>('daily');
+  const [results, setResults] = useState<
+    Record<string, ExportResult>
+  >({});
+
+  async function runExport(key: ExportKey) {
+    setBusy(key);
+
+    setResults((current) => ({
+      ...current,
+      [key]: { ok: true, text: '' },
+    }));
+
+    try {
+      let output;
+
+      if (key === 'inventory') {
+        output = await downloadCsv('/reports/inventory.csv', { status });
+      } else if (key === 'transfers') {
+        output = await downloadCsv('/reports/transfers.csv', { from, to });
+      } else {
+        output = await downloadCsv('/reports/sales.csv', { from, to });
+      }
+
+      setResults((current) => ({
+        ...current,
+        [key]: {
+          ok: true,
+          text: `Downloaded ${output.filename} with ${output.rows} row${output.rows === 1 ? '' : 's'}.`,
+        },
+      }));
+    } catch (err) {
+      setResults((current) => ({
+        ...current,
+        [key]: {
+          ok: false,
+          text: errorMessage(err),
+        },
+      }));
+    } finally {
+      setBusy('');
+    }
+  }
+
+  function exportNotice(key: string) {
+    const result = results[key];
+
+    if (!result?.text) return null;
+
+    return (
+      <div
+        role={result.ok ? 'status' : 'alert'}
+        className={`flex items-start gap-2 rounded-xl p-3 text-sm ${
+          result.ok
+            ? 'bg-green-50 text-green-800'
+            : 'bg-red-50 text-red-700'
+        }`}
+      >
+        <Icon
+          name={result.ok ? 'checkCircle' : 'warningCircle'}
+          className="mt-0.5 h-4 w-4 shrink-0"
+        />
+        <p>{result.text}</p>
+      </div>
+    );
+  }
+
   if (loading && !data) return <LoadingBlock />;
 
   if (error || !data) {
@@ -113,8 +197,26 @@ export default function AnalysisPage() {
     0
   );
 
+  const invalidDates = !!from && !!to && from > to;
+
+  const salesRows =
+    salesView === 'daily'
+      ? sales.daily.slice(-14).map((item) => ({
+          label: formatDate(item.date),
+          value: item.unitsSold,
+          color: '#16a34a',
+        }))
+      : sales.monthly.map((item) => ({
+          label: item.month,
+          value: item.unitsSold,
+          color: '#2563eb',
+        }));
+
+  const salesTotal = salesRows.reduce((sum, item) => sum + item.value, 0);
+
   return (
     <div className="min-w-0 space-y-6 overflow-x-clip">
+      {/* Page introduction */}
       <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <span className="mb-2 inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
@@ -122,11 +224,12 @@ export default function AnalysisPage() {
           </span>
 
           <h1 className="text-2xl font-bold tracking-tight text-gray-950">
-            Analytics & Analysis
+            Reports & Analytics
           </h1>
 
           <p className="mt-1 text-sm text-gray-500">
-            Understand your stock, sales activity and pharmacy transfers.
+            Understand your stock, sales activity, pharmacy transfers and
+            business performance.
           </p>
         </div>
 
@@ -143,6 +246,7 @@ export default function AnalysisPage() {
         </div>
       </section>
 
+      {/* Performance overview */}
       <section>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-gray-900">
@@ -192,6 +296,7 @@ export default function AnalysisPage() {
         </div>
       </section>
 
+      {/* Sales-to-stock explanation */}
       <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-blue-600">
@@ -236,6 +341,110 @@ export default function AnalysisPage() {
         </div>
       </div>
 
+      {/* Daily and monthly sales analytics */}
+      <PageCard
+        title="Sales activity"
+        action={
+          <span className="text-xs text-gray-400">
+            {num(sales.unitsSold)} units in {data.window.days} days
+          </span>
+        }
+      >
+        <div className="space-y-5 p-5">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">
+                Units sold over time
+              </h3>
+              <p className="mt-1 text-xs text-gray-500">
+                Track recorded sales activity by day or month.
+              </p>
+            </div>
+
+            <div className="inline-flex w-fit rounded-lg bg-gray-100 p-1">
+              <button
+                type="button"
+                onClick={() => setSalesView('daily')}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                  salesView === 'daily'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                Daily
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSalesView('monthly')}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                  salesView === 'monthly'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                Monthly
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl bg-green-50/70 p-4">
+              <p className="text-xs font-medium text-green-700">
+                Total units sold
+              </p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-gray-950">
+                {num(sales.unitsSold)}
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                Across the reporting period
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-blue-50/70 p-4">
+              <p className="text-xs font-medium text-blue-700">
+                Sales records
+              </p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-gray-950">
+                {num(sales.recordCount)}
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                Individual recorded sales entries
+              </p>
+            </div>
+          </div>
+
+          {salesRows.length > 0 ? (
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-medium text-gray-500">
+                  {salesView === 'daily'
+                    ? 'Daily breakdown (latest 14 days)'
+                    : 'Monthly breakdown'}
+                </p>
+                <p className="text-sm font-semibold tabular-nums text-gray-900">
+                  {num(salesTotal)} units
+                </p>
+              </div>
+
+              <Bars rows={salesRows} />
+            </>
+          ) : (
+            <EmptyState
+              title="No sales recorded yet"
+              body="Record sales from your inventory to see daily and monthly sales activity here."
+            />
+          )}
+
+          <p className="text-xs leading-relaxed text-gray-400">
+            This report tracks quantities sold, not sales revenue. Revenue
+            cannot currently be calculated because sale prices are not stored
+            in sales records.
+          </p>
+        </div>
+      </PageCard>
+
+      {/* Inventory and transfer analytics */}
       <section className="grid min-w-0 gap-5 xl:grid-cols-2">
         <PageCard
           title="Inventory by category"
@@ -338,12 +547,259 @@ export default function AnalysisPage() {
         </PageCard>
       </section>
 
-      <p className="text-xs leading-relaxed text-gray-400">
-        Analytics are generated from records currently available in your
-        PharmaCycle.AI account. Sales metrics use the reporting period
-        shown above, while completed transfers and verified partners
-        follow their respective all-time counts.
-      </p>
+      {/* Export centre */}
+      <section className="space-y-4">
+        <div>
+          <span className="mb-2 inline-flex rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
+            Data & exports
+          </span>
+
+          <h2 className="text-xl font-bold text-gray-900">
+            Export centre
+          </h2>
+
+          <p className="mt-1 text-sm text-gray-500">
+            Download your pharmacy records for bookkeeping, analysis and
+            business reporting.
+          </p>
+        </div>
+
+        <div className="grid min-w-0 gap-5 xl:grid-cols-2">
+          {/* Inventory export */}
+          <PageCard title="Inventory report">
+            <div className="space-y-5 p-5">
+              <div className="flex items-start gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-700">
+                  <Icon name="package" className="h-5 w-5" />
+                </span>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    Export inventory records
+                  </h3>
+                  <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                    Download your medicine records, batches, quantities
+                    and prices.
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-gray-50 p-4">
+                <p className="text-xs leading-relaxed text-gray-600">
+                  Includes every matching inventory record, not just the
+                  current page. Prices are in naira, and NAFDAC numbers
+                  are exported as entered.
+                </p>
+              </div>
+
+              <Field label="Filter by stock status" htmlFor="rp-status">
+                <select
+                  id="rp-status"
+                  className="input"
+                  value={status}
+                  onChange={(event) => setStatus(event.target.value)}
+                >
+                  <option value="">All statuses</option>
+                  {Object.entries(STOCK_META).map(([key, value]) => (
+                    <option key={key} value={key}>
+                      {value.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <button
+                className="btn btn-primary w-full"
+                onClick={() => runExport('inventory')}
+                disabled={!!busy}
+              >
+                {busy === 'inventory' ? (
+                  <Spinner className="h-4 w-4" />
+                ) : (
+                  <Icon name="download" className="h-4 w-4" />
+                )}
+                {busy === 'inventory'
+                  ? 'Preparing report…'
+                  : 'Download inventory CSV'}
+              </button>
+
+              {exportNotice('inventory')}
+            </div>
+          </PageCard>
+
+          {/* Transfer export */}
+          <PageCard title="Transfer report">
+            <div className="space-y-5 p-5">
+              <div className="flex items-start gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                  <Icon name="repeat" className="h-5 w-5" />
+                </span>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    Export transfer records
+                  </h3>
+                  <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                    Download incoming and outgoing pharmacy transfer
+                    requests.
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-gray-50 p-4">
+                <p className="text-xs leading-relaxed text-gray-600">
+                  Filter requests by the date they were made. Leave both
+                  dates empty to export all available transfer records.
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="From date" htmlFor="rp-from">
+                  <input
+                    id="rp-from"
+                    type="date"
+                    className="input"
+                    value={from}
+                    onChange={(event) => setFrom(event.target.value)}
+                    max={to || undefined}
+                  />
+                </Field>
+
+                <Field label="To date (inclusive)" htmlFor="rp-to">
+                  <input
+                    id="rp-to"
+                    type="date"
+                    className="input"
+                    value={to}
+                    onChange={(event) => setTo(event.target.value)}
+                    min={from || undefined}
+                  />
+                </Field>
+              </div>
+
+              {invalidDates && (
+                <p className="text-sm text-red-700">
+                  The start date must be on or before the end date.
+                </p>
+              )}
+
+              <button
+                className="btn btn-primary w-full"
+                onClick={() => runExport('transfers')}
+                disabled={!!busy || invalidDates}
+              >
+                {busy === 'transfers' ? (
+                  <Spinner className="h-4 w-4" />
+                ) : (
+                  <Icon name="download" className="h-4 w-4" />
+                )}
+                {busy === 'transfers'
+                  ? 'Preparing report…'
+                  : 'Download transfers CSV'}
+              </button>
+
+              {exportNotice('transfers')}
+            </div>
+          </PageCard>
+
+          {/* Sales export */}
+          <PageCard title="Sales report">
+            <div className="space-y-5 p-5">
+              <div className="flex items-start gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-700">
+                  <Icon name="chart" className="h-5 w-5" />
+                </span>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    Export sales records
+                  </h3>
+                  <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                    Download recorded medicine sales and quantities sold.
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-gray-50 p-4">
+                <p className="text-xs leading-relaxed text-gray-600">
+                  Includes medicine details, units sold, sale dates and
+                  record timestamps. Sales are filtered by the selected
+                  date range.
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="From date" htmlFor="sales-from">
+                  <input
+                    id="sales-from"
+                    type="date"
+                    className="input"
+                    value={from}
+                    onChange={(event) => setFrom(event.target.value)}
+                    max={to || undefined}
+                  />
+                </Field>
+
+                <Field label="To date (inclusive)" htmlFor="sales-to">
+                  <input
+                    id="sales-to"
+                    type="date"
+                    className="input"
+                    value={to}
+                    onChange={(event) => setTo(event.target.value)}
+                    min={from || undefined}
+                  />
+                </Field>
+              </div>
+
+              {invalidDates && (
+                <p className="text-sm text-red-700">
+                  The start date must be on or before the end date.
+                </p>
+              )}
+
+              <button
+                className="btn btn-primary w-full"
+                onClick={() => runExport('sales')}
+                disabled={!!busy || invalidDates}
+              >
+                {busy === 'sales' ? (
+                  <Spinner className="h-4 w-4" />
+                ) : (
+                  <Icon name="download" className="h-4 w-4" />
+                )}
+                {busy === 'sales'
+                  ? 'Preparing report…'
+                  : 'Download sales CSV'}
+              </button>
+
+              {exportNotice('sales')}
+            </div>
+          </PageCard>
+        </div>
+      </section>
+
+      {/* Export information */}
+      <div className="flex items-start gap-3 rounded-xl border border-gray-100 bg-white p-4">
+        <Icon
+          name="file"
+          className="mt-0.5 h-5 w-5 shrink-0 text-gray-500"
+        />
+        <div>
+          <p className="text-sm font-semibold text-gray-900">
+            About your reports
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-gray-500">
+            Analytics are generated from records currently available in
+            your PharmaCycle.AI account. Sales metrics use the reporting
+            period shown above, while completed transfers and verified
+            partners follow their respective all-time counts. Sales
+            exports contain quantities, not revenue. CSV exports can be
+            opened with Microsoft Excel, Google Sheets or other
+            spreadsheet applications.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RequestBadge } from '@/components/StatusBadge';
 import {
   EmptyState,
@@ -75,6 +75,10 @@ export default function TransferRequestsPage() {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  const [newRequestIds, setNewRequestIds] = useState<string[]>([]);
+
+  const previousIncomingIds = useRef<Set<string> | null>(null);
+  const previousPendingCount = useRef<number | null>(null);
 
   const summary = useApi<{
     incoming: Counts;
@@ -92,6 +96,65 @@ export default function TransferRequestsPage() {
   });
 
   const counts = summary.data?.[dir];
+
+  // Automatically refresh requests and counters every 15 seconds.
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        summary.reload();
+        list.reload();
+      }
+    }, 15000);
+
+    return () => window.clearInterval(interval);
+  }, [summary.reload, list.reload]);
+
+  // Detect newly received incoming requests.
+  useEffect(() => {
+    if (dir !== 'incoming' || !list.data) return;
+
+    const currentIds = new Set(
+      list.data.requests.map((request) => request.id)
+    );
+
+    if (previousIncomingIds.current === null) {
+      previousIncomingIds.current = currentIds;
+      return;
+    }
+
+    const newIds = [...currentIds].filter(
+      (id) => !previousIncomingIds.current!.has(id)
+    );
+
+    if (newIds.length > 0) {
+      setNewRequestIds((previous) => [
+        ...new Set([...previous, ...newIds]),
+      ]);
+
+      toast.success(
+        `${newIds.length} new incoming request${newIds.length > 1 ? 's' : ''} received.`
+      );
+    }
+
+    previousIncomingIds.current = currentIds;
+  }, [dir, list.data, toast]);
+
+  // Notify when the number of pending incoming requests increases.
+  useEffect(() => {
+    const pendingCount = summary.data?.incoming.PENDING;
+
+    if (pendingCount === undefined) return;
+
+    if (
+      previousPendingCount.current !== null &&
+      pendingCount > previousPendingCount.current
+    ) {
+      summary.reload();
+      list.reload();
+    }
+
+    previousPendingCount.current = pendingCount;
+  }, [summary.data, summary.reload, list.reload]);
 
   async function confirm() {
     if (!act) return;
@@ -128,11 +191,20 @@ export default function TransferRequestsPage() {
     }
   }
 
+  function changeDirection(nextDir: Dir) {
+    setDir(nextDir);
+    setPage(1);
+    setStatus('');
+    setOpen(null);
+    setNewRequestIds([]);
+    previousIncomingIds.current = null;
+    previousPendingCount.current = null;
+  }
+
   const copy = act ? ACTION_COPY[act.action] : null;
 
   return (
     <div className="space-y-6 pb-8">
-
       {/* Page introduction */}
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7">
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
@@ -160,7 +232,9 @@ export default function TransferRequestsPage() {
               {counts ? counts.PENDING : '—'}
             </p>
             <p className="mt-1 text-xs text-gray-500">
-              {dir === 'incoming' ? 'Awaiting your response' : 'Awaiting supplier response'}
+              {dir === 'incoming'
+                ? 'Awaiting your response'
+                : 'Awaiting supplier response'}
             </p>
           </div>
         </div>
@@ -171,12 +245,7 @@ export default function TransferRequestsPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="inline-flex w-fit rounded-xl bg-gray-100 p-1">
             <button
-              onClick={() => {
-                setDir('incoming');
-                setPage(1);
-                setStatus('');
-                setOpen(null);
-              }}
+              onClick={() => changeDirection('incoming')}
               className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
                 dir === 'incoming'
                   ? 'bg-white text-gray-950 shadow-sm'
@@ -192,12 +261,7 @@ export default function TransferRequestsPage() {
             </button>
 
             <button
-              onClick={() => {
-                setDir('outgoing');
-                setPage(1);
-                setStatus('');
-                setOpen(null);
-              }}
+              onClick={() => changeDirection('outgoing')}
               className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
                 dir === 'outgoing'
                   ? 'bg-white text-gray-950 shadow-sm'
@@ -266,7 +330,9 @@ export default function TransferRequestsPage() {
               className="rounded-xl border border-gray-200 bg-white p-3.5 sm:p-4"
             >
               <div className="flex items-center gap-2">
-                <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${item.bg} ${item.color}`}>
+                <div
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg ${item.bg} ${item.color}`}
+                >
                   <Icon name={item.icon} className="h-4 w-4" />
                 </div>
                 <p className="text-xs font-medium text-gray-500">
@@ -290,6 +356,10 @@ export default function TransferRequestsPage() {
             </h2>
             <p className="mt-1 text-xs text-gray-500">
               Review details and manage each transfer.
+            </p>
+            <p className="mt-1 text-[11px] text-emerald-700">
+              <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Automatically refreshes every 15 seconds
             </p>
           </div>
 
@@ -351,9 +421,17 @@ export default function TransferRequestsPage() {
             <ul className="divide-y divide-gray-100">
               {list.data.requests.map((request) => {
                 const expanded = open === request.id;
+                const isNew = newRequestIds.includes(request.id);
 
                 return (
-                  <li key={request.id} className="p-4 transition hover:bg-gray-50/60 sm:p-5">
+                  <li
+                    key={request.id}
+                    className={`p-4 transition sm:p-5 ${
+                      isNew
+                        ? 'bg-emerald-50/60'
+                        : 'hover:bg-gray-50/60'
+                    }`}
+                  >
                     <div className="flex flex-col gap-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -364,6 +442,11 @@ export default function TransferRequestsPage() {
                             <span className="text-sm text-gray-500">
                               {request.medicine.strength}
                             </span>
+                            {isNew && (
+                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                                NEW
+                              </span>
+                            )}
                           </div>
 
                           <p className="mt-1 text-sm text-gray-600">
@@ -521,10 +604,7 @@ export default function TransferRequestsPage() {
                             setOpen(expanded ? null : request.id)
                           }
                         >
-                          <Icon
-                            name="clock"
-                            className="h-4 w-4"
-                          />
+                          <Icon name="clock" className="h-4 w-4" />
                           {expanded ? 'Hide history' : 'Activity history'}
                           <Icon
                             name="chevronDown"

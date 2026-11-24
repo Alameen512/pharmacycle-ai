@@ -1,6 +1,7 @@
 
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import {
   Badge,
@@ -42,12 +43,7 @@ export default function PharmaciesPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const {
-    data,
-    error,
-    loading,
-    reload,
-  } = useApi<{
+  const { data, error, loading, reload } = useApi<{
     pharmacies: P[];
     pagination: Pg;
     sortedByDistance: boolean;
@@ -107,7 +103,6 @@ export default function PharmaciesPage() {
 
   return (
     <div className="min-w-0 space-y-6 overflow-x-clip">
-      {/* Page introduction */}
       <section className="flex min-w-0 flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div className="min-w-0">
           <span className="mb-2 inline-flex rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
@@ -137,7 +132,6 @@ export default function PharmaciesPage() {
         </div>
       </section>
 
-      {/* Search and filters */}
       <section className="card space-y-4 p-4 sm:p-5">
         <div>
           <h2 className="font-semibold text-gray-900">
@@ -182,11 +176,15 @@ export default function PharmaciesPage() {
 
           <button
             className="btn btn-secondary shrink-0"
-            onClick={coords ? () => {
-              setCoords(null);
-              setPage(1);
-              setGeoMsg('');
-            } : locate}
+            onClick={
+              coords
+                ? () => {
+                    setCoords(null);
+                    setPage(1);
+                    setGeoMsg('');
+                  }
+                : locate
+            }
             disabled={locating}
           >
             <Icon name="pin" className="h-4 w-4" />
@@ -223,7 +221,6 @@ export default function PharmaciesPage() {
         )}
       </section>
 
-      {/* Directory results */}
       <section className="min-w-0 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -275,9 +272,11 @@ export default function PharmaciesPage() {
           <>
             <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {data.pharmacies.map((pharmacy) => (
-                <article
+                <Link
                   key={pharmacy.id}
-                  className="card flex min-w-0 flex-col p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:p-5"
+                  href={`/pharmacies/${pharmacy.id}`}
+                  className="card group flex min-w-0 flex-col p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-green-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-600 sm:p-5"
+                  aria-label={`View ${pharmacy.name} pharmacy profile`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-700">
@@ -285,7 +284,7 @@ export default function PharmaciesPage() {
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <h3 className="break-words font-semibold leading-snug text-gray-900">
+                      <h3 className="break-words font-semibold leading-snug text-gray-900 group-hover:text-green-700">
                         {pharmacy.name}
                       </h3>
                       <p className="mt-1 text-xs text-gray-500">
@@ -321,17 +320,23 @@ export default function PharmaciesPage() {
                   </div>
 
                   <div className="mt-5 flex items-center justify-between gap-2 border-t border-gray-100 pt-3">
-                    <span className="text-xs text-gray-400">
-                      Verified partner
+                    <span className="text-xs font-medium text-green-700">
+                      View pharmacy and available stock
                     </span>
 
-                    {pharmacy.distanceKm !== null && (
-                      <span className="rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-700">
-                        {pharmacy.distanceKm} km away
-                      </span>
-                    )}
+                    <span className="flex items-center gap-2">
+                      {pharmacy.distanceKm !== null && (
+                        <span className="rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-700">
+                          {pharmacy.distanceKm} km away
+                        </span>
+                      )}
+                      <Icon
+                        name="chevronRight"
+                        className="h-4 w-4 text-gray-400 transition group-hover:translate-x-1 group-hover:text-green-700"
+                      />
+                    </span>
                   </div>
-                </article>
+                </Link>
               ))}
             </div>
 

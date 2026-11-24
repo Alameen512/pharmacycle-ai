@@ -1,3 +1,4 @@
+
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { requirePharmacy } = require('../middleware/auth');
@@ -7,45 +8,141 @@ router.use(requirePharmacy);
 
 const DAYS = 90;
 
+function lagosDateKey(date) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Lagos',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
 router.get('/summary', async (req, res) => {
   const pharmacyId = req.auth.pharmacyId;
   const to = new Date();
   const from = new Date(to.getTime() - DAYS * 86400000);
-  const [items, incoming, outgoing, sold, partners] = await Promise.all([
-    prisma.inventoryItem.findMany({ where: { pharmacyId, deletedAt: null }, select: { quantity: true, status: true, medicine: { select: { category: true } } } }),
-    prisma.transferRequest.groupBy({ by: ['status'], where: { listing: { pharmacyId } }, _count: { _all: true } }),
-    prisma.transferRequest.groupBy({ by: ['status'], where: { requestingPharmacyId: pharmacyId }, _count: { _all: true } }),
-    prisma.salesRecord.aggregate({ where: { pharmacyId, date: { gte: from } }, _sum: { quantitySold: true }, _count: { _all: true } }),
-    prisma.pharmacy.count({ where: { verificationStatus: 'VERIFIED', id: { not: pharmacyId } } }),
-  ]);
+
+  const [items, incoming, outgoing, sold, salesRecords, partners] =
+    await Promise.all([
+      prisma.inventoryItem.findMany({
+        where: { pharmacyId, deletedAt: null },
+        select: {
+          quantity: true,
+          status: true,
+          medicine: { select: { category: true } },
+        },
+      }),
+      prisma.transferRequest.groupBy({
+        by: ['status'],
+        where: { listing: { pharmacyId } },
+        _count: { _all: true },
+      }),
+      prisma.transferRequest.groupBy({
+        by: ['status'],
+        where: { requestingPharmacyId: pharmacyId },
+        _count: { _all: true },
+      }),
+      prisma.salesRecord.aggregate({
+        where: { pharmacyId, date: { gte: from } },
+        _sum: { quantitySold: true },
+        _count: { _all: true },
+      }),
+      prisma.salesRecord.findMany({
+        where: { pharmacyId, date: { gte: from, lte: to } },
+        select: { date: true, quantitySold: true },
+      }),
+      prisma.pharmacy.count({
+        where: {
+          verificationStatus: 'VERIFIED',
+          id: { not: pharmacyId },
+        },
+      }),
+    ]);
 
   const categories = {};
   let unitsOnHand = 0;
   let atRiskUnits = 0;
+
   for (const it of items) {
-    const c = (categories[it.medicine.category] ||= { category: it.medicine.category, records: 0, units: 0 });
+    const c = (categories[it.medicine.category] ||= {
+      category: it.medicine.category,
+      records: 0,
+      units: 0,
+    });
+
     c.records += 1;
     c.units += it.quantity;
-    if (!['EXPIRED', 'OUT_OF_STOCK'].includes(it.status)) unitsOnHand += it.quantity;
-    if (['NEAR_EXPIRY', 'EXPIRED'].includes(it.status)) atRiskUnits += it.quantity;
+
+    if (!['EXPIRED', 'OUT_OF_STOCK'].includes(it.status)) {
+      unitsOnHand += it.quantity;
+    }
+
+    if (['NEAR_EXPIRY', 'EXPIRED'].includes(it.status)) {
+      atRiskUnits += it.quantity;
+    }
   }
-  const fold = (g) => Object.fromEntries(['PENDING', 'ACCEPTED', 'REJECTED', 'COMPLETED', 'CANCELLED'].map((s) => [s, g.find((x) => x.status === s)?._count._all || 0]));
+
+  const fold = (groups) =>
+    Object.fromEntries(
+      ['PENDING', 'ACCEPTED', 'REJECTED', 'COMPLETED', 'CANCELLED'].map(
+        (status) => [
+          status,
+          groups.find((item) => item.status === status)?._count._all || 0,
+        ]
+      )
+    );
+
   const incomingByStatus = fold(incoming);
   const outgoingByStatus = fold(outgoing);
   const unitsSold = sold._sum.quantitySold || 0;
 
+  const dailySales = new Map();
+  const monthlySales = new Map();
+
+  for (const record of salesRecords) {
+    const date = lagosDateKey(record.date);
+    const month = date.slice(0, 7);
+
+    dailySales.set(
+      date,
+      (dailySales.get(date) || 0) + record.quantitySold
+    );
+
+    monthlySales.set(
+      month,
+      (monthlySales.get(month) || 0) + record.quantitySold
+    );
+  }
+
   res.json({
     window: { days: DAYS, from, to },
-    categories: Object.values(categories).sort((a, b) => b.units - a.units),
-    transfers: { incoming: incomingByStatus, outgoing: outgoingByStatus, completed: incomingByStatus.COMPLETED + outgoingByStatus.COMPLETED },
+    categories: Object.values(categories).sort(
+      (a, b) => b.units - a.units
+    ),
+    transfers: {
+      incoming: incomingByStatus,
+      outgoing: outgoingByStatus,
+      completed:
+        incomingByStatus.COMPLETED + outgoingByStatus.COMPLETED,
+    },
     atRiskUnits,
     partners,
     sales: {
       recordCount: sold._count._all,
       unitsSold,
       unitsOnHand,
-      // Honest name: units sold in the window divided by usable units on hand today. Not accounting-grade turnover.
-      salesToStockRatio: unitsOnHand > 0 && sold._count._all > 0 ? Math.round((unitsSold / unitsOnHand) * 100) / 100 : null,
+      salesToStockRatio:
+        unitsOnHand > 0 && sold._count._all > 0
+          ? Math.round((unitsSold / unitsOnHand) * 100) / 100
+          : null,
+      daily: Array.from(dailySales, ([date, unitsSold]) => ({
+        date,
+        unitsSold,
+      })).sort((a, b) => a.date.localeCompare(b.date)),
+      monthly: Array.from(monthlySales, ([month, unitsSold]) => ({
+        month,
+        unitsSold,
+      })).sort((a, b) => a.month.localeCompare(b.month)),
     },
   });
 });

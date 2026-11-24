@@ -1,4 +1,6 @@
+
 'use client';
+
 import Link from 'next/link';
 import { useEffect, useId, useRef } from 'react';
 import type { Tone } from '@/lib/format';
@@ -42,14 +44,35 @@ const ICONS: Record<string, string[]> = {
   warningCircle: ['M12 2a10 10 0 1 0 0 20a10 10 0 0 0 0-20Z', 'M12 8v4', 'M12.125 15.75H12M12.25 15.75C12.25 15.8881 12.1381 16 12 16C11.8619 16 11.75 15.8881 11.75 15.75C11.75 15.6119 11.8619 15.5 12 15.5C12.1381 15.5 12.25 15.6119 12.25 15.75Z'],
   sprout: ['M18 10C18 10 12 14 12 21', 'M9.34882 11.1825C7.73784 12.3891 5.44323 12.26 3.9785 10.7953C1.55484 8.37164 2.03957 3.03957 2.03957 3.03957C2.03957 3.03957 7.37164 2.55484 9.7953 4.9785C10.7548 5.93803 11.1412 7.25369 10.9543 8.5', 'M14.9638 12.8175C13.644 11.3832 13.6797 9.14983 15.0708 7.75867C17.2252 5.6043 21.9648 6.03517 21.9648 6.03517C21.9648 6.03517 22.3957 10.7748 20.2413 12.9292C19.4877 13.6828 18.487 14.0386 17.5 13.9967', 'M6 7C6 7 12 12 12 21'],
   checkCircle: ['M22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12Z', 'M8 12.5L10.5 15L16 9'],
+
+  // Added icons for the partner pharmacy profile page.
+  arrowLeft: ['M19 12H5', 'M12 19l-7-7 7-7'],
+  phone: ['M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.36 1.9.7 2.8a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.84.58 2.8.7a2 2 0 0 1 1.73 2.03z'],
 };
 
 export type IconName = keyof typeof ICONS;
 
-export function Icon({ name, className = 'h-5 w-5' }: { name: IconName; className?: string }) {
+export function Icon({
+  name,
+  className = 'h-5 w-5',
+}: {
+  name: IconName;
+  className?: string;
+}) {
+  const paths = ICONS[name] ?? ICONS.help;
+
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
-      {ICONS[name].map((d, i) => (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      {paths.map((d, i) => (
         <path key={i} d={d} />
       ))}
     </svg>
@@ -65,8 +88,18 @@ const TONES: Record<Tone, string> = {
   gray: 'bg-gray-100 text-gray-700',
 };
 
-export function Badge({ tone = 'gray', children }: { tone?: Tone; children: React.ReactNode }) {
-  return <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${TONES[tone]}`}>{children}</span>;
+export function Badge({
+  tone = 'gray',
+  children,
+}: {
+  tone?: Tone;
+  children: React.ReactNode;
+}) {
+  return (
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${TONES[tone]}`}>
+      {children}
+    </span>
+  );
 }
 
 const STAT_TONES: Record<Tone, string> = {
@@ -78,7 +111,21 @@ const STAT_TONES: Record<Tone, string> = {
   gray: 'bg-gray-500 text-white',
 };
 
-export function StatCard({ label, value, icon, tone = 'green', href, hint }: { label: string; value: React.ReactNode; icon: IconName; tone?: Tone; href?: string; hint?: string }) {
+export function StatCard({
+  label,
+  value,
+  icon,
+  tone = 'green',
+  href,
+  hint,
+}: {
+  label: string;
+  value: React.ReactNode;
+  icon: IconName;
+  tone?: Tone;
+  href?: string;
+  hint?: string;
+}) {
   const body = (
     <div className="flex items-start gap-3">
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${STAT_TONES[tone]}`}>
@@ -91,9 +138,14 @@ export function StatCard({ label, value, icon, tone = 'green', href, hint }: { l
       </div>
     </div>
   );
+
   const cls = 'card block p-4 transition-shadow duration-200 hover:shadow-md';
+
   return href ? (
-    <Link href={href} className={`${cls} transition-colors hover:border-brand-200 focus-visible:outline-2 focus-visible:outline-brand-600`}>
+    <Link
+      href={href}
+      className={`${cls} transition-colors hover:border-brand-200 focus-visible:outline-2 focus-visible:outline-brand-600`}
+    >
       {body}
     </Link>
   ) : (
@@ -101,44 +153,105 @@ export function StatCard({ label, value, icon, tone = 'green', href, hint }: { l
   );
 }
 
-export function DonutChart({ segments, centerLabel }: { segments: { label: string; value: number; color: string }[]; centerLabel: string }) {
+export function DonutChart({
+  segments,
+  centerLabel,
+}: {
+  segments: { label: string; value: number; color: string }[];
+  centerLabel: string;
+}) {
   const total = segments.reduce((s, x) => s + x.value, 0);
   const r = 52;
   const c = 2 * Math.PI * r;
   let acc = 0;
+
   return (
-    <svg viewBox="0 0 140 140" role="img" aria-label={`${centerLabel}: ${total} total. ${segments.map((s) => `${s.label} ${s.value}`).join(', ')}`} className="h-44 w-44">
+    <svg
+      viewBox="0 0 140 140"
+      role="img"
+      aria-label={`${centerLabel}: ${total} total. ${segments.map((s) => `${s.label} ${s.value}`).join(', ')}`}
+      className="h-44 w-44"
+    >
       <circle cx="70" cy="70" r={r} fill="none" stroke="#f3f4f6" strokeWidth="16" />
       {total > 0 &&
         segments
           .filter((s) => s.value > 0)
           .map((s) => {
             const len = (s.value / total) * c;
-            const el = <circle key={s.label} cx="70" cy="70" r={r} fill="none" stroke={s.color} strokeWidth="16" strokeDasharray={`${len} ${c - len}`} strokeDashoffset={-acc} transform="rotate(-90 70 70)" />;
+            const el = (
+              <circle
+                key={s.label}
+                cx="70"
+                cy="70"
+                r={r}
+                fill="none"
+                stroke={s.color}
+                strokeWidth="16"
+                strokeDasharray={`${len} ${c - len}`}
+                strokeDashoffset={-acc}
+                transform="rotate(-90 70 70)"
+              />
+            );
             acc += len;
             return el;
           })}
-      <text x="70" y="68" textAnchor="middle" className="fill-gray-900 text-[22px] font-semibold">{total}</text>
-      <text x="70" y="86" textAnchor="middle" className="fill-gray-500 text-[9px]">{centerLabel}</text>
+      <text x="70" y="68" textAnchor="middle" className="fill-gray-900 text-[22px] font-semibold">
+        {total}
+      </text>
+      <text x="70" y="86" textAnchor="middle" className="fill-gray-500 text-[9px]">
+        {centerLabel}
+      </text>
     </svg>
   );
 }
 
-export function Pagination({ page, totalPages, total, onPage }: { page: number; totalPages: number; total: number; onPage: (p: number) => void }) {
+export function Pagination({
+  page,
+  totalPages,
+  total,
+  onPage,
+}: {
+  page: number;
+  totalPages: number;
+  total: number;
+  onPage: (p: number) => void;
+}) {
   if (total === 0) return null;
+
   return (
-    <nav aria-label="Pagination" className="flex items-center justify-between gap-3 px-1 py-3 text-sm text-gray-600">
+    <nav
+      aria-label="Pagination"
+      className="flex items-center justify-between gap-3 px-1 py-3 text-sm text-gray-600"
+    >
       <span>Page {page} of {totalPages} · {total} total</span>
       <div className="flex gap-2">
-        <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => onPage(page - 1)}>Previous</button>
-        <button className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => onPage(page + 1)}>Next</button>
+        <button
+          className="btn btn-secondary btn-sm"
+          disabled={page <= 1}
+          onClick={() => onPage(page - 1)}
+        >
+          Previous
+        </button>
+        <button
+          className="btn btn-secondary btn-sm"
+          disabled={page >= totalPages}
+          onClick={() => onPage(page + 1)}
+        >
+          Next
+        </button>
       </div>
     </nav>
   );
 }
 
 export function Spinner({ className = 'h-5 w-5' }: { className?: string }) {
-  return <span role="status" aria-label="Loading" className={`inline-block animate-spin rounded-full border-2 border-gray-300 border-t-brand-600 ${className}`} />;
+  return (
+    <span
+      role="status"
+      aria-label="Loading"
+      className={`inline-block animate-spin rounded-full border-2 border-gray-300 border-t-brand-600 ${className}`}
+    />
+  );
 }
 
 export function LoadingBlock({ label = 'Loading…' }: { label?: string }) {
@@ -149,7 +262,15 @@ export function LoadingBlock({ label = 'Loading…' }: { label?: string }) {
   );
 }
 
-export function EmptyState({ title, body, action }: { title: string; body?: string; action?: React.ReactNode }) {
+export function EmptyState({
+  title,
+  body,
+  action,
+}: {
+  title: string;
+  body?: string;
+  action?: React.ReactNode;
+}) {
   return (
     <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
       <p className="font-medium text-gray-900">{title}</p>
@@ -159,21 +280,59 @@ export function EmptyState({ title, body, action }: { title: string; body?: stri
   );
 }
 
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+export function ErrorState({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry?: () => void;
+}) {
   return (
     <div role="alert" className="flex flex-col items-center gap-3 px-6 py-10 text-center">
       <p className="text-sm text-red-700">{message}</p>
-      {onRetry && <button className="btn btn-secondary btn-sm" onClick={onRetry}>Try again</button>}
+      {onRetry && (
+        <button className="btn btn-secondary btn-sm" onClick={onRetry}>
+          Try again
+        </button>
+      )}
     </div>
   );
 }
 
-export function Notice({ tone = 'blue', children }: { tone?: 'blue' | 'orange' | 'red' | 'green'; children: React.ReactNode }) {
-  const t = { blue: 'border-blue-200 bg-blue-50 text-blue-900', orange: 'border-orange-200 bg-orange-50 text-orange-900', red: 'border-red-200 bg-red-50 text-red-900', green: 'border-brand-200 bg-brand-50 text-brand-900' };
-  return <div role="note" className={`rounded-xl border px-4 py-3 text-sm ${t[tone]}`}>{children}</div>;
+export function Notice({
+  tone = 'blue',
+  children,
+}: {
+  tone?: 'blue' | 'orange' | 'red' | 'green';
+  children: React.ReactNode;
+}) {
+  const t = {
+    blue: 'border-blue-200 bg-blue-50 text-blue-900',
+    orange: 'border-orange-200 bg-orange-50 text-orange-900',
+    red: 'border-red-200 bg-red-50 text-red-900',
+    green: 'border-brand-200 bg-brand-50 text-brand-900',
+  };
+
+  return (
+    <div role="note" className={`rounded-xl border px-4 py-3 text-sm ${t[tone]}`}>
+      {children}
+    </div>
+  );
 }
 
-export function Field({ label, error, hint, htmlFor, children }: { label: string; error?: string; hint?: string; htmlFor: string; children: React.ReactNode }) {
+export function Field({
+  label,
+  error,
+  hint,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  error?: string;
+  hint?: string;
+  htmlFor: string;
+  children: React.ReactNode;
+}) {
   return (
     <div>
       <label htmlFor={htmlFor} className="label">{label}</label>
@@ -184,23 +343,55 @@ export function Field({ label, error, hint, htmlFor, children }: { label: string
   );
 }
 
-export function Toggle({ checked, onChange, label, description, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; description?: string; disabled?: boolean }) {
+export function Toggle({
+  checked,
+  onChange,
+  label,
+  description,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  description?: string;
+  disabled?: boolean;
+}) {
   const id = useId();
+
   return (
     <div className="flex items-start justify-between gap-4 py-3">
       <div>
         <p id={id} className="text-sm font-medium text-gray-900">{label}</p>
         {description && <p className="text-xs text-gray-500">{description}</p>}
       </div>
-      <button type="button" role="switch" aria-checked={checked} aria-labelledby={id} disabled={disabled} onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:opacity-50 ${checked ? 'bg-brand-600' : 'bg-gray-300'}`}>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-labelledby={id}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:opacity-50 ${checked ? 'bg-brand-600' : 'bg-gray-300'}`}
+      >
         <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
       </button>
     </div>
   );
 }
 
-export function Modal({ open, title, onClose, children, size = 'md' }: { open: boolean; title: string; onClose: () => void; children: React.ReactNode; size?: 'md' | 'lg' }) {
+export function Modal({
+  open,
+  title,
+  onClose,
+  children,
+  size = 'md',
+}: {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  size?: 'md' | 'lg';
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -208,23 +399,46 @@ export function Modal({ open, title, onClose, children, size = 'md' }: { open: b
 
   useEffect(() => {
     if (!open) return;
+
     const prev = document.activeElement as HTMLElement | null;
-    const focusable = () => Array.from<HTMLElement>(ref.current?.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])') ?? []);
+
+    const focusable = () =>
+      Array.from<HTMLElement>(
+        ref.current?.querySelectorAll<HTMLElement>(
+          'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+        ) ?? []
+      );
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeRef.current();
+
       if (e.key === 'Tab') {
         const f = focusable();
         if (!f.length) return;
+
         const first = f[0];
         const last = f[f.length - 1];
-        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
+
     document.addEventListener('keydown', onKey);
+
     const overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    const t = setTimeout(() => (ref.current?.querySelector<HTMLElement>('input:not([type=hidden]),select,textarea') ?? ref.current)?.focus(), 0);
+
+    const t = setTimeout(
+      () => (ref.current?.querySelector<HTMLElement>('input:not([type=hidden]),select,textarea') ?? ref.current)?.focus(),
+      0
+    );
+
     return () => {
       clearTimeout(t);
       document.removeEventListener('keydown', onKey);
@@ -234,14 +448,27 @@ export function Modal({ open, title, onClose, children, size = 'md' }: { open: b
   }, [open]);
 
   if (!open) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
-      <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
-      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}
-        className={`relative max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-xl focus:outline-none sm:rounded-2xl ${size === 'lg' ? 'sm:max-w-2xl' : 'sm:max-w-lg'}`}>
+      <div
+        className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className={`relative max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-xl focus:outline-none sm:rounded-2xl ${size === 'lg' ? 'sm:max-w-2xl' : 'sm:max-w-lg'}`}
+      >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-5 py-4">
           <h2 id={titleId} className="text-base font-semibold text-gray-900">{title}</h2>
-          <button className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Close dialog"><Icon name="x" className="h-4 w-4" /></button>
+          <button className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Close dialog">
+            <Icon name="x" className="h-4 w-4" />
+          </button>
         </div>
         <div className="p-5">{children}</div>
       </div>
@@ -249,21 +476,51 @@ export function Modal({ open, title, onClose, children, size = 'md' }: { open: b
   );
 }
 
-export function ConfirmDialog({ open, title, body, confirmLabel, busy, onConfirm, onClose }: { open: boolean; title: string; body: React.ReactNode; confirmLabel: string; busy?: boolean; onConfirm: () => void; onClose: () => void }) {
+export function ConfirmDialog({
+  open,
+  title,
+  body,
+  confirmLabel,
+  busy,
+  onConfirm,
+  onClose,
+}: {
+  open: boolean;
+  title: string;
+  body: React.ReactNode;
+  confirmLabel: string;
+  busy?: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
   return (
     <Modal open={open} title={title} onClose={onClose}>
       <div className="space-y-5">
         <div className="text-sm text-gray-600">{body}</div>
         <div className="flex justify-end gap-2">
-          <button className="btn btn-secondary" onClick={onClose} disabled={busy}>Keep it</button>
-          <button className="btn btn-danger" onClick={onConfirm} disabled={busy}>{busy ? 'Working…' : confirmLabel}</button>
+          <button className="btn btn-secondary" onClick={onClose} disabled={busy}>
+            Keep it
+          </button>
+          <button className="btn btn-danger" onClick={onConfirm} disabled={busy}>
+            {busy ? 'Working…' : confirmLabel}
+          </button>
         </div>
       </div>
     </Modal>
   );
 }
 
-export function PageCard({ title, action, children, className = '' }: { title?: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) {
+export function PageCard({
+  title,
+  action,
+  children,
+  className = '',
+}: {
+  title?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <section className={`card ${className}`}>
       {(title || action) && (
