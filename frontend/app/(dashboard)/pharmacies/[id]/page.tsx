@@ -30,10 +30,87 @@ type Partner = {
   verifiedAt: string | null;
 };
 
+type InventoryStatus =
+  | 'ALL'
+  | 'HEALTHY'
+  | 'LOW_STOCK'
+  | 'NEAR_EXPIRY'
+  | 'OUT_OF_STOCK'
+  | 'EXPIRED';
+
+type InventoryItem = {
+  id: string;
+  medicine: {
+    name: string;
+    strength: string;
+    dosageForm: string | null;
+    category: string | null;
+    imageUrl: string | null;
+  };
+  batchNumber: string;
+  quantity: number;
+  reservedQty: number;
+  availableQuantity: number;
+  expiryDate: string;
+  daysToExpiry: number;
+  status: Exclude<InventoryStatus, 'ALL'>;
+  listedForTransfer: boolean;
+  listedQuantity: number;
+};
+
+type InventorySummary = {
+  totalBatches: number;
+  totalUnits: number;
+  availableUnits: number;
+  listedBatches: number;
+  healthy: number;
+  lowStock: number;
+  nearExpiry: number;
+  outOfStock: number;
+  expired: number;
+};
+
 type ProfileResponse = {
   pharmacy: Partner;
+  summary: InventorySummary;
+  inventory: InventoryItem[];
+  inventoryPagination: Pg;
   listings: Listing[];
   pagination: Pg;
+};
+
+const inventoryStatuses: {
+  value: InventoryStatus;
+  label: string;
+}[] = [
+  { value: 'ALL', label: 'All stock' },
+  { value: 'HEALTHY', label: 'Healthy stock' },
+  { value: 'LOW_STOCK', label: 'Low stock' },
+  { value: 'NEAR_EXPIRY', label: 'Near expiry' },
+  { value: 'OUT_OF_STOCK', label: 'Out of stock' },
+  { value: 'EXPIRED', label: 'Expired' },
+];
+
+const statusStyles: Record<
+  Exclude<InventoryStatus, 'ALL'>,
+  string
+> = {
+  HEALTHY: 'bg-green-50 text-green-700',
+  LOW_STOCK: 'bg-amber-50 text-amber-700',
+  NEAR_EXPIRY: 'bg-orange-50 text-orange-700',
+  OUT_OF_STOCK: 'bg-gray-100 text-gray-700',
+  EXPIRED: 'bg-red-50 text-red-700',
+};
+
+const statusLabels: Record<
+  Exclude<InventoryStatus, 'ALL'>,
+  string
+> = {
+  HEALTHY: 'Healthy',
+  LOW_STOCK: 'Low stock',
+  NEAR_EXPIRY: 'Near expiry',
+  OUT_OF_STOCK: 'Out of stock',
+  EXPIRED: 'Expired',
 };
 
 export default function PharmacyProfilePage() {
@@ -41,6 +118,10 @@ export default function PharmacyProfilePage() {
   const pharmacyId = params.id;
 
   const [page, setPage] = useState(1);
+  const [inventoryPage, setInventoryPage] = useState(1);
+  const [inventoryStatus, setInventoryStatus] =
+    useState<InventoryStatus>('ALL');
+  const [inventorySearch, setInventorySearch] = useState('');
   const [target, setTarget] = useState<Listing | null>(null);
 
   const { session } = useAuth();
@@ -55,8 +136,59 @@ export default function PharmacyProfilePage() {
     {
       page,
       pageSize: 12,
+      inventoryPage,
+      inventoryPageSize: 12,
+      status: inventoryStatus,
+      search: inventorySearch,
     }
   );
+
+  const summaryCards = data
+    ? [
+        {
+          label: 'Total batches',
+          value: data.summary.totalBatches,
+          detail: 'Medicine batches',
+          style: 'bg-blue-50 text-blue-700',
+          icon: 'package' as const,
+        },
+        {
+          label: 'Total units',
+          value: data.summary.totalUnits,
+          detail: 'Recorded stock',
+          style: 'bg-green-50 text-green-700',
+          icon: 'layers' as const,
+        },
+        {
+          label: 'Low stock',
+          value: data.summary.lowStock,
+          detail: '50 units or less',
+          style: 'bg-amber-50 text-amber-700',
+          icon: 'alertTriangle' as const,
+        },
+        {
+          label: 'Near expiry',
+          value: data.summary.nearExpiry,
+          detail: 'Within 30 days',
+          style: 'bg-orange-50 text-orange-700',
+          icon: 'clock' as const,
+        },
+        {
+          label: 'Out of stock',
+          value: data.summary.outOfStock,
+          detail: 'No available units',
+          style: 'bg-gray-100 text-gray-700',
+          icon: 'package' as const,
+        },
+        {
+          label: 'Expired',
+          value: data.summary.expired,
+          detail: 'Past expiry date',
+          style: 'bg-red-50 text-red-700',
+          icon: 'alertTriangle' as const,
+        },
+      ]
+    : [];
 
   return (
     <div className="min-w-0 space-y-6 overflow-x-clip">
@@ -87,6 +219,7 @@ export default function PharmacyProfilePage() {
         </div>
       ) : (
         <>
+          {/* Pharmacy information */}
           <section className="card overflow-hidden">
             <div className="h-2 bg-green-600" />
 
@@ -143,6 +276,283 @@ export default function PharmacyProfilePage() {
             </div>
           </section>
 
+          {/* Inventory overview */}
+          <section className="min-w-0 space-y-4">
+            <div>
+              <h2 className="text-lg font-bold text-gray-950">
+                Inventory overview
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                View this pharmacy's recorded stock levels, availability and
+                expiry information.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+              {summaryCards.map((item) => (
+                <article
+                  key={item.label}
+                  className="card min-w-0 p-4"
+                >
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-xl ${item.style}`}
+                  >
+                    <Icon name={item.icon} className="h-4 w-4" />
+                  </div>
+
+                  <p className="mt-3 text-xs font-medium text-gray-500">
+                    {item.label}
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-gray-950">
+                    {item.value.toLocaleString()}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {item.detail}
+                  </p>
+                </article>
+              ))}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="card flex items-center justify-between gap-3 p-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">
+                    Available units
+                  </p>
+                  <p className="mt-1 text-xl font-bold text-gray-950">
+                    {data.summary.availableUnits.toLocaleString()}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-green-50 p-3 text-green-700">
+                  <Icon name="package" className="h-5 w-5" />
+                </div>
+              </div>
+
+              <div className="card flex items-center justify-between gap-3 p-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">
+                    Batches listed for transfer
+                  </p>
+                  <p className="mt-1 text-xl font-bold text-gray-950">
+                    {data.summary.listedBatches.toLocaleString()}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-blue-50 p-3 text-blue-700">
+                  <Icon name="shoppingBag" className="h-5 w-5" />
+                </div>
+              </div>
+            </div>
+
+            {/* Inventory search and filters */}
+            <div className="card space-y-4 p-4 sm:p-5">
+              <div>
+                <h3 className="font-semibold text-gray-900">
+                  Pharmacy stock records
+                </h3>
+                <p className="mt-1 text-xs text-gray-500">
+                  Search medicines or filter by their current stock status.
+                </p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="relative">
+                  <Icon
+                    name="search"
+                    className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                  />
+                  <input
+                    type="search"
+                    value={inventorySearch}
+                    onChange={(event) => {
+                      setInventorySearch(event.target.value);
+                      setInventoryPage(1);
+                    }}
+                    placeholder="Search medicine or batch number..."
+                    className="input w-full pl-9"
+                  />
+                </div>
+
+                <select
+                  value={inventoryStatus}
+                  onChange={(event) => {
+                    setInventoryStatus(
+                      event.target.value as InventoryStatus
+                    );
+                    setInventoryPage(1);
+                  }}
+                  className="input w-full"
+                >
+                  {inventoryStatuses.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {loading && !data.inventory.length ? (
+              <div className="card">
+                <LoadingBlock />
+              </div>
+            ) : !data.inventory.length ? (
+              <div className="card">
+                <EmptyState
+                  title="No inventory records found"
+                  body="There are no stock records matching your search or selected filter."
+                />
+              </div>
+            ) : (
+              <>
+                <div className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {data.inventory.map((item) => (
+                    <article
+                      key={item.id}
+                      className="card min-w-0 p-4 sm:p-5"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gray-50 text-gray-500">
+                          {item.medicine.imageUrl ? (
+                            <img
+                              src={item.medicine.imageUrl}
+                              alt={item.medicine.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <Icon name="package" className="h-5 w-5" />
+                          )}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <h4 className="break-words font-semibold text-gray-900">
+                            {item.medicine.name}
+                          </h4>
+                          <p className="mt-1 text-xs text-gray-500">
+                            {item.medicine.strength}
+                            {item.medicine.dosageForm
+                              ? ` · ${item.medicine.dosageForm}`
+                              : ''}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            statusStyles[item.status]
+                          }`}
+                        >
+                          {statusLabels[item.status]}
+                        </span>
+
+                        {item.listedForTransfer && (
+                          <span className="text-xs font-medium text-green-700">
+                            Listed for transfer
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-gray-50 p-3">
+                        <div>
+                          <p className="text-xs text-gray-500">
+                            Total quantity
+                          </p>
+                          <p className="mt-1 text-lg font-bold text-gray-900">
+                            {item.quantity.toLocaleString()}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-xs text-gray-500">
+                            Available units
+                          </p>
+                          <p className="mt-1 text-lg font-bold text-green-700">
+                            {item.availableQuantity.toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 space-y-2">
+                        <div className="flex justify-between gap-3 text-sm">
+                          <span className="text-gray-500">
+                            Reserved units
+                          </span>
+                          <span className="font-medium text-gray-800">
+                            {item.reservedQty.toLocaleString()}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between gap-3 text-sm">
+                          <span className="text-gray-500">
+                            Expiry date
+                          </span>
+                          <span className="font-medium text-gray-800">
+                            {formatDate(item.expiryDate)}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between gap-3 text-sm">
+                          <span className="text-gray-500">
+                            Batch number
+                          </span>
+                          <span className="max-w-[60%] break-all text-right font-medium text-gray-800">
+                            {item.batchNumber}
+                          </span>
+                        </div>
+
+                        {item.daysToExpiry >= 0 &&
+                          item.daysToExpiry <= 30 && (
+                            <div className="flex justify-between gap-3 text-sm">
+                              <span className="text-orange-700">
+                                Time to expiry
+                              </span>
+                              <span className="font-semibold text-orange-700">
+                                {item.daysToExpiry === 0
+                                  ? 'Expires today'
+                                  : `${item.daysToExpiry} days`}
+                              </span>
+                            </div>
+                          )}
+
+                        {item.daysToExpiry < 0 && (
+                          <div className="flex justify-between gap-3 text-sm">
+                            <span className="text-red-700">
+                              Expired
+                            </span>
+                            <span className="font-semibold text-red-700">
+                              {Math.abs(item.daysToExpiry)} days ago
+                            </span>
+                          </div>
+                        )}
+
+                        {item.listedForTransfer && (
+                          <div className="flex justify-between gap-3 text-sm">
+                            <span className="text-gray-500">
+                              Listed quantity
+                            </span>
+                            <span className="font-medium text-gray-800">
+                              {item.listedQuantity.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+
+                <div className="rounded-xl border border-gray-100 bg-white px-4">
+                  <Pagination
+                    page={data.inventoryPagination.page}
+                    totalPages={data.inventoryPagination.totalPages}
+                    total={data.inventoryPagination.total}
+                    onPage={setInventoryPage}
+                  />
+                </div>
+              </>
+            )}
+          </section>
+
+          {/* Marketplace listings */}
           <section className="min-w-0 space-y-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>

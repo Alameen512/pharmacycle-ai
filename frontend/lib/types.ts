@@ -1,16 +1,23 @@
+
 export type Pagination = { page: number; pageSize: number; total: number; totalPages: number };
 export type InventoryStatus = 'HEALTHY' | 'LOW_STOCK' | 'NEAR_EXPIRY' | 'OUT_OF_STOCK' | 'EXPIRED';
 export type RequestStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED';
 export type ListingStatus = 'AVAILABLE' | 'PENDING' | 'COMPLETED' | 'CANCELLED';
 export type Verification = 'PENDING' | 'VERIFIED' | 'REJECTED';
 
-export interface MedicineInfo { name: string; strength: string; dosageForm: string; category?: string }
+export interface MedicineInfo {
+  name: string;
+  strength: string;
+  dosageForm: string;
+  category?: string;
+}
 
 export interface InventoryItem {
   id: string;
   quantity: number;
   reservedQty: number;
   availableQty: number;
+  listableQty?: number;
   costPrice: number;
   sellingPrice: number;
   batchNumber: string;
@@ -44,7 +51,13 @@ export interface Listing {
   pendingRequests?: number;
 }
 
-export interface Partner { id: string; name: string; city: string; state: string; phone: string | null }
+export interface Partner {
+  id: string;
+  name: string;
+  city: string;
+  state: string;
+  phone: string | null;
+}
 
 export interface TransferRequestRow {
   id: string;
@@ -72,12 +85,30 @@ export interface AlertRow {
   createdAt: string;
 }
 
-export interface AppConfig { ai: boolean; serverOcr: boolean; email: boolean; imageUploads: boolean }
+export interface AppConfig {
+  ai: boolean;
+  serverOcr: boolean;
+  email: boolean;
+  imageUploads: boolean;
+}
 
 export interface InsightPayload {
   summary: string;
-  recommendations: { medicine: string; action: string; reason: string; priority: 'high' | 'medium' | 'low' }[];
+  recommendations: {
+    medicine: string;
+    action: string;
+    reason: string;
+    priority: 'high' | 'medium' | 'low';
+  }[];
   inputs?: Record<string, number>;
   disclaimer?: string;
 }
-export interface Insight { id: string; type: string; payload: InsightPayload; inputWindowDays: number; model: string | null; generatedAt: string }
+
+export interface Insight {
+  id: string;
+  type: string;
+  payload: InsightPayload;
+  inputWindowDays: number;
+  model: string | null;
+  generatedAt: string;
+}

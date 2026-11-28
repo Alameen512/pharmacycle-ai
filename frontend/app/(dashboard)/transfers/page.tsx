@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -35,6 +34,12 @@ export default function TransfersPage() {
   const [tab, setTab] = useState<Tab>('available');
   const [search, setSearch] = useState('');
   const [dsearch, setDsearch] = useState('');
+  const [category, setCategory] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [dcategory, setDcategory] = useState('');
+  const [dcity, setDcity] = useState('');
+  const [dstate, setDstate] = useState('');
   const [page, setPage] = useState(1);
   const [target, setTarget] = useState<Listing | null>(null);
   const [creating, setCreating] = useState(false);
@@ -55,19 +60,29 @@ export default function TransfersPage() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDsearch(search);
+      setDsearch(search.trim());
+      setDcategory(category.trim());
+      setDcity(city.trim());
+      setDstate(state.trim());
       setPage(1);
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, category, city, state]);
 
   const available = useApi<{
     listings: Listing[];
     pagination: Pg;
   }>(
     tab === 'available' ? '/transfers/available' : null,
-    { search: dsearch, page, pageSize: 12 }
+    {
+      search: dsearch,
+      category: dcategory,
+      city: dcity,
+      state: dstate,
+      page,
+      pageSize: 12,
+    }
   );
 
   const mine = useApi<{ listings: Listing[] }>(
@@ -106,10 +121,12 @@ export default function TransfersPage() {
 
   const availableCount = available.data?.pagination.total ?? 0;
   const myListings = mine.data?.listings ?? [];
+
   const activeListings = myListings.filter(
     (listing) =>
       listing.status === 'AVAILABLE' || listing.status === 'PENDING'
   ).length;
+
   const pendingRequests = myListings.reduce(
     (total, listing) => total + (listing.pendingRequests ?? 0),
     0
@@ -117,7 +134,6 @@ export default function TransfersPage() {
 
   return (
     <div className="space-y-6 pb-8">
-
       {/* Marketplace introduction */}
       <section className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7">
         <div className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full bg-emerald-50" />
@@ -262,28 +278,75 @@ export default function TransfersPage() {
         {/* Browse medicines */}
         {tab === 'available' && (
           <div className="space-y-5">
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <div className="relative flex-1">
-                <Icon
-                  name="search"
-                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-                />
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="relative sm:col-span-2 xl:col-span-1">
+                  <Icon
+                    name="search"
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                  />
+                  <input
+                    aria-label="Search marketplace"
+                    className="input pl-9"
+                    placeholder="Search medicine name..."
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                  />
+                </div>
+
                 <input
-                  aria-label="Search marketplace"
-                  className="input pl-9"
-                  placeholder="Search medicine name..."
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  aria-label="Filter by medicine category"
+                  className="input"
+                  placeholder="Medicine category"
+                  value={category}
+                  onChange={(event) => setCategory(event.target.value)}
+                />
+
+                <input
+                  aria-label="Filter by city"
+                  className="input"
+                  placeholder="City"
+                  value={city}
+                  onChange={(event) => setCity(event.target.value)}
+                />
+
+                <input
+                  aria-label="Filter by state"
+                  className="input"
+                  placeholder="State"
+                  value={state}
+                  onChange={(event) => setState(event.target.value)}
                 />
               </div>
 
-              <button
-                className="btn btn-secondary"
-                onClick={available.reload}
-              >
-                <Icon name="repeat" className="h-4 w-4" />
-                Refresh
-              </button>
+              <div className="mt-3 flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setSearch('');
+                    setCategory('');
+                    setCity('');
+                    setState('');
+                    setDsearch('');
+                    setDcategory('');
+                    setDcity('');
+                    setDstate('');
+                    setPage(1);
+                  }}
+                >
+                  Clear filters
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={available.reload}
+                >
+                  <Icon name="repeat" className="h-4 w-4" />
+                  Refresh
+                </button>
+              </div>
             </div>
 
             {available.loading && !available.data ? (
@@ -299,13 +362,13 @@ export default function TransfersPage() {
               <div className="card">
                 <EmptyState
                   title={
-                    dsearch
+                    dsearch || dcategory || dcity || dstate
                       ? 'No matching medicines found'
                       : 'No medicines listed yet'
                   }
                   body={
-                    dsearch
-                      ? 'Try another medicine name or check back later.'
+                    dsearch || dcategory || dcity || dstate
+                      ? 'Try changing or clearing your filters.'
                       : 'When verified pharmacies list surplus stock, it will appear here. You can also list your own available stock.'
                   }
                 />
@@ -339,13 +402,21 @@ export default function TransfersPage() {
                             <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
                               Medicine
                             </p>
+
                             <h3 className="mt-1 text-lg font-bold leading-snug text-gray-950">
                               {listing.medicine.name}
                             </h3>
+
                             <p className="mt-1 text-sm text-gray-500">
                               {listing.medicine.strength} ·{' '}
                               {listing.medicine.dosageForm}
                             </p>
+
+                            {listing.medicine.category && (
+                              <span className="mt-2 inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+                                {listing.medicine.category}
+                              </span>
+                            )}
                           </div>
 
                           {listing.discountPercent > 0 && (
@@ -361,10 +432,21 @@ export default function TransfersPage() {
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700">
                             <Icon name="pharmacy" className="h-4 w-4" />
                           </div>
+
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-gray-800">
-                              {listing.pharmacy?.name || 'Partner pharmacy'}
-                            </p>
+                            {listing.pharmacy?.id ? (
+                              <a
+                                href={`/pharmacies/${listing.pharmacy.id}`}
+                                className="truncate text-sm font-semibold text-emerald-700 hover:text-emerald-800 hover:underline"
+                              >
+                                {listing.pharmacy.name}
+                              </a>
+                            ) : (
+                              <p className="truncate text-sm font-semibold text-gray-800">
+                                {listing.pharmacy?.name || 'Partner pharmacy'}
+                              </p>
+                            )}
+
                             <p className="truncate text-xs text-gray-500">
                               {[listing.pharmacy?.city, listing.pharmacy?.state]
                                 .filter(Boolean)
@@ -382,6 +464,7 @@ export default function TransfersPage() {
                               {listing.remaining} units
                             </p>
                           </div>
+
                           <div>
                             <p className="text-xs text-gray-500">Batch</p>
                             <p className="mt-1 truncate text-sm font-semibold text-gray-900">
@@ -395,9 +478,11 @@ export default function TransfersPage() {
                             <p className="text-xs text-gray-500">
                               Offer price per unit
                             </p>
+
                             <p className="mt-1 text-xl font-bold text-gray-950">
                               {naira(listing.unitPrice)}
                             </p>
+
                             {listing.discountPercent > 0 && (
                               <p className="mt-0.5 text-xs text-gray-400">
                                 <s>{naira(listing.originalPrice)}</s>
@@ -409,6 +494,7 @@ export default function TransfersPage() {
                             <p className="text-xs text-gray-500">
                               Expiry information
                             </p>
+
                             <p className="mt-1 text-xs font-semibold text-gray-700">
                               {expiryNote(listing.daysToExpiry)}
                             </p>
@@ -423,7 +509,10 @@ export default function TransfersPage() {
                           onClick={() => setTarget(listing)}
                         >
                           Request this stock
-                          <Icon name="chevronDown" className="h-4 w-4 -rotate-90" />
+                          <Icon
+                            name="chevronDown"
+                            className="h-4 w-4 -rotate-90"
+                          />
                         </button>
                       </div>
                     </article>
@@ -449,10 +538,12 @@ export default function TransfersPage() {
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
                   <Icon name="package" className="h-5 w-5" />
                 </div>
+
                 <div>
                   <h2 className="font-semibold text-gray-900">
                     Your marketplace listings
                   </h2>
+
                   <p className="mt-1 text-sm leading-5 text-gray-500">
                     Manage the stock you have offered to other pharmacies.
                     Review pending requests and update or withdraw your offers.
@@ -473,6 +564,7 @@ export default function TransfersPage() {
                   title="Your marketplace is empty"
                   body="List eligible inventory to make your surplus stock available to other verified pharmacies."
                 />
+
                 <div className="flex justify-center pb-5">
                   <button
                     className="btn btn-primary"
@@ -491,10 +583,12 @@ export default function TransfersPage() {
                     <h3 className="font-semibold text-gray-900">
                       Your listed medicines
                     </h3>
+
                     <p className="mt-1 text-xs text-gray-500">
                       {myListings.length} listing(s)
                     </p>
                   </div>
+
                   <button
                     className="btn btn-secondary btn-sm"
                     onClick={mine.reload}
@@ -519,11 +613,7 @@ export default function TransfersPage() {
                           'Status',
                           '',
                         ].map((heading) => (
-                          <th
-                            key={heading}
-                            className="th"
-                            scope="col"
-                          >
+                          <th key={heading} className="th" scope="col">
                             {heading || (
                               <span className="sr-only">Actions</span>
                             )}
@@ -539,11 +629,15 @@ export default function TransfersPage() {
                           listing.status === 'PENDING';
 
                         return (
-                          <tr key={listing.id} className="hover:bg-gray-50/70">
+                          <tr
+                            key={listing.id}
+                            className="hover:bg-gray-50/70"
+                          >
                             <td className="td">
                               <p className="font-semibold text-gray-900">
                                 {listing.medicine.name}
                               </p>
+
                               <p className="text-xs text-gray-500">
                                 {listing.medicine.strength} ·{' '}
                                 {listing.medicine.dosageForm}
@@ -565,6 +659,7 @@ export default function TransfersPage() {
                               <p className="font-semibold">
                                 {naira(listing.unitPrice)}
                               </p>
+
                               {listing.discountPercent > 0 && (
                                 <p className="text-xs text-emerald-700">
                                   {listing.discountPercent}% off
@@ -599,10 +694,7 @@ export default function TransfersPage() {
                                     onClick={() => setCancelling(listing)}
                                     aria-label={`Cancel listing for ${listing.medicine.name}`}
                                   >
-                                    <Icon
-                                      name="x"
-                                      className="h-4 w-4"
-                                    />
+                                    <Icon name="x" className="h-4 w-4" />
                                   </button>
                                 </div>
                               )}
@@ -692,7 +784,9 @@ function ListingModal({
   onClose: () => void;
   onDone: () => void;
 }) {
-  const items = useApi<{ items: InventoryItem[] }>(
+  const items = useApi<{
+    items: (InventoryItem & { listableQty?: number })[];
+  }>(
     open && !listing ? '/inventory' : null,
     { eligible: 'true', pageSize: 100 }
   );
@@ -727,6 +821,8 @@ function ListingModal({
 
     if (!Number.isInteger(quantity) || quantity < 1) {
       local.quantity = 'Enter a whole number, 1 or more.';
+    } else if (!listing && chosen && quantity > chosenListableQty) {
+      local.quantity = `Only ${chosenListableQty} uncommitted unit(s) are available to list.`;
     }
 
     if (
@@ -779,6 +875,10 @@ function ListingModal({
 
   const chosen = items.data?.items.find((item) => item.id === itemId);
 
+  const chosenListableQty = chosen
+    ? Math.max(0, chosen.listableQty ?? chosen.quantity)
+    : 0;
+
   return (
     <Modal
       open={open}
@@ -809,9 +909,7 @@ function ListingModal({
             error={errs.inventoryItemId}
           >
             {items.loading ? (
-              <p className="text-sm text-gray-500">
-                Loading your stock…
-              </p>
+              <p className="text-sm text-gray-500">Loading your stock…</p>
             ) : items.error ? (
               <p className="text-sm text-red-700">{items.error}</p>
             ) : !items.data?.items.length ? (
@@ -828,10 +926,16 @@ function ListingModal({
                 onChange={(event) => setItemId(event.target.value)}
               >
                 <option value="">Select an inventory item…</option>
+
                 {items.data.items.map((item) => (
-                  <option key={item.id} value={item.id}>
+                  <option
+                    key={item.id}
+                    value={item.id}
+                    disabled={(item.listableQty ?? item.quantity) <= 0}
+                  >
                     {item.medicine.name} {item.medicine.strength} · batch{' '}
-                    {item.batchNumber} · {item.quantity} in stock ·{' '}
+                    {item.batchNumber} ·{' '}
+                    {Math.max(0, item.listableQty ?? item.quantity)} listable ·{' '}
                     {expiryNote(item.daysToExpiry)}
                   </option>
                 ))}
@@ -845,12 +949,17 @@ function ListingModal({
             label="Units to offer"
             htmlFor="l-qty"
             error={errs.quantity}
-            hint={chosen ? `${chosen.quantity} on hand` : undefined}
+            hint={
+              chosen
+                ? `${chosenListableQty} unit(s) available to list (${chosen.quantity} on hand)`
+                : undefined
+            }
           >
             <input
               id="l-qty"
               type="number"
               min={1}
+              max={!listing && chosen ? chosenListableQty : undefined}
               step={1}
               className={`input ${
                 errs.quantity ? 'input-error' : ''
