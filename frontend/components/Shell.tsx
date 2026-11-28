@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useApi } from '@/lib/useApi';
@@ -34,6 +34,35 @@ const NAV_GROUPS: NavGroup[] = [
     items: [],
   },
   {
+    id: 'marketplace',
+    href: '/transfers',
+    label: 'Marketplace',
+    icon: 'shoppingBag',
+    items: [
+      {
+        href: '/transfers',
+        label: 'Browse medicines',
+        icon: 'search',
+        title: 'Marketplace',
+        subtitle: 'Discover medicines listed by verified pharmacies and request the stock you need.',
+      },
+      {
+        href: '/transfers?tab=mine',
+        label: 'My listings',
+        icon: 'package',
+        title: 'My Listings',
+        subtitle: 'Manage the medicines and quantities your pharmacy offers for sale.',
+      },
+      {
+        href: '/transfer-requests',
+        label: 'Orders',
+        icon: 'inbox',
+        title: 'Orders',
+        subtitle: 'Manage incoming and outgoing medicine orders from other pharmacies.',
+      },
+    ],
+  },
+  {
     id: 'inventory',
     href: '/inventory',
     label: 'Inventory',
@@ -44,43 +73,14 @@ const NAV_GROUPS: NavGroup[] = [
         label: 'Stock management',
         icon: 'package',
         title: 'Inventory',
-        subtitle: 'Manage your medicine stock and track inventory in real-time.',
+        subtitle: 'Manage your medicine stock and track inventory in real time.',
       },
       {
         href: '/scan',
         label: 'Scan medicines',
         icon: 'camera',
         title: 'Scan Medicines',
-        subtitle: 'Photograph a label to auto-fill medicine details.',
-      },
-    ],
-  },
-  {
-    id: 'marketplace',
-    href: '/transfers',
-    label: 'Marketplace',
-    icon: 'repeat',
-    items: [
-      {
-        href: '/transfers',
-        label: 'Browse medicines',
-        icon: 'search',
-        title: 'Marketplace',
-        subtitle: 'Find, request and manage medicine transfers between pharmacies.',
-      },
-      {
-        href: '/transfers?tab=mine',
-        label: 'My listings',
-        icon: 'package',
-        title: 'My Listings',
-        subtitle: 'Manage medicines your pharmacy has listed for transfer.',
-      },
-      {
-        href: '/transfer-requests',
-        label: 'Transfer requests',
-        icon: 'inbox',
-        title: 'Transfer Requests',
-        subtitle: 'Manage incoming and outgoing medicine transfer requests.',
+        subtitle: 'Photograph a medicine label to auto-fill its details.',
       },
     ],
   },
@@ -95,7 +95,7 @@ const NAV_GROUPS: NavGroup[] = [
         label: 'Partner pharmacies',
         icon: 'users',
         title: 'Partner Pharmacies',
-        subtitle: 'View verified pharmacies connected to the network.',
+        subtitle: 'Discover verified pharmacies and explore their inventory.',
       },
     ],
   },
@@ -110,21 +110,21 @@ const NAV_GROUPS: NavGroup[] = [
         label: 'AI insights',
         icon: 'zap',
         title: 'AI Insights',
-        subtitle: 'Smart insights to help you reduce waste, optimize inventory and improve availability.',
+        subtitle: 'Smart insights to help reduce waste and optimize inventory.',
       },
       {
         href: '/analysis',
         label: 'Reports & Analytics',
         icon: 'chart',
         title: 'Reports & Analytics',
-        subtitle: 'Track business performance, review inventory and transfers, and export reports.',
+        subtitle: 'Track business performance, inventory and transfers.',
       },
       {
         href: '/alerts',
         label: 'Alerts',
         icon: 'bell',
         title: 'Alerts',
-        subtitle: 'Stay on top of inventory risks, transfers, and network updates.',
+        subtitle: 'Stay on top of inventory risks, orders and network updates.',
       },
     ],
   },
@@ -136,14 +136,14 @@ const UTILITY_LINKS: NavItem[] = [
     label: 'Settings',
     icon: 'sliders',
     title: 'Settings',
-    subtitle: 'Manage your pharmacy profile, notifications, and preferences.',
+    subtitle: 'Manage your pharmacy profile, notifications and preferences.',
   },
   {
     href: '/help',
     label: 'Help & Support',
     icon: 'help',
     title: 'Help & Support',
-    subtitle: 'Find answers, get help, and learn how to make the most of PharmaCycle.AI.',
+    subtitle: 'Find answers and get help using PharmaCycle.AI.',
   },
 ];
 
@@ -159,8 +159,20 @@ function initials(name: string) {
   );
 }
 
-function matchesPath(pathname: string, href: string) {
-  return pathname === href || pathname.startsWith(`${href}/`);
+function isItemActive(
+  pathname: string,
+  searchParams: ReturnType<typeof useSearchParams>,
+  item: NavItem
+) {
+  if (item.href === '/transfers?tab=mine') {
+    return pathname === '/transfers' && searchParams.get('tab') === 'mine';
+  }
+
+  if (item.href === '/transfers') {
+    return pathname === '/transfers' && searchParams.get('tab') !== 'mine';
+  }
+
+  return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
 function NavList({
@@ -171,10 +183,13 @@ function NavList({
   badges: { requests: number; alerts: number };
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const activeGroup = NAV_GROUPS.find((group) =>
     group.items.length
-      ? group.items.some((item) => matchesPath(pathname, item.href))
+      ? group.items.some((item) =>
+          isItemActive(pathname, searchParams, item)
+        )
       : pathname === group.href
   );
 
@@ -185,14 +200,6 @@ function NavList({
   useEffect(() => {
     setExpandedGroup(activeGroup?.id ?? null);
   }, [activeGroup?.id]);
-
-  const isItemActive = (item: NavItem) => {
-    if (item.href === '/transfers') {
-      return pathname === '/transfers';
-    }
-
-    return pathname === item.href || pathname.startsWith(`${item.href}/`);
-  };
 
   const renderBadge = (href: string) => {
     if (href === '/transfer-requests' && badges.requests > 0) {
@@ -222,7 +229,9 @@ function NavList({
       {NAV_GROUPS.map((group) => {
         const active =
           group.items.length > 0
-            ? group.items.some((item) => isItemActive(item))
+            ? group.items.some((item) =>
+                isItemActive(pathname, searchParams, item)
+              )
             : pathname === group.href;
 
         const expanded = expandedGroup === group.id;
@@ -278,7 +287,11 @@ function NavList({
             {group.items.length > 0 && expanded && (
               <div className="ml-5 mt-1 space-y-1 border-l border-gray-200 pl-3">
                 {group.items.map((item) => {
-                  const itemActive = isItemActive(item);
+                  const itemActive = isItemActive(
+                    pathname,
+                    searchParams,
+                    item
+                  );
 
                   return (
                     <Link
@@ -345,6 +358,7 @@ function UtilityLinks({ onNavigate }: { onNavigate?: () => void }) {
 export function Shell({ children }: { children: React.ReactNode }) {
   const { session, signOut } = useAuth();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
 
   const [drawer, setDrawer] = useState(false);
@@ -355,7 +369,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
     ...UTILITY_LINKS,
   ];
 
-  const meta = allPages.find((item) => item.href === pathname);
+  const meta =
+    pathname === '/transfers' && searchParams.get('tab') === 'mine'
+      ? allPages.find((item) => item.href === '/transfers?tab=mine')
+      : allPages.find((item) => item.href === pathname);
 
   const { data } = useApi<{ summary: { unread: number } }>('/alerts', {
     pageSize: 1,

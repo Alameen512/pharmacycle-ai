@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { RequestModal } from '@/components/RequestModal';
 import { ListingBadge } from '@/components/StatusBadge';
 import {
@@ -26,6 +27,9 @@ type Tab = 'available' | 'mine';
 export default function TransfersPage() {
   const { session } = useAuth();
   const toast = useToast();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const newParam = searchParams.get('new');
 
   const verified =
     session?.kind === 'pharmacy' &&
@@ -48,15 +52,12 @@ export default function TransfersPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    setTab(tabParam === 'mine' || newParam ? 'mine' : 'available');
 
-    if (params.get('tab') === 'mine') setTab('mine');
-
-    if (params.get('new')) {
-      setTab('mine');
+    if (newParam) {
       setCreating(true);
     }
-  }, []);
+  }, [tabParam, newParam]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -337,8 +338,7 @@ export default function TransfersPage() {
                 >
                   Clear filters
                 </button>
-
-                <button
+                                <button
                   type="button"
                   className="btn btn-secondary"
                   onClick={available.reload}
@@ -677,7 +677,7 @@ export default function TransfersPage() {
 
                             <td className="td">
                               {isOpen && (
-                                <div className="flex gap-1">
+                                                                <div className="flex gap-1">
                                   <button
                                     className="btn btn-ghost btn-sm"
                                     onClick={() => setEditing(listing)}
